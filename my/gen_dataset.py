@@ -36,16 +36,20 @@ def get_blocks_and_bboxes(image, bboxes):
             for bbox in bboxes_ext:
                 cls, xc, yc, w, h, x1, y1, x2, y2 = bbox
                 
-                if not (x2 < x_start or x1 >= x_end or y2 < y_start or y1 >= y_end):
+                if x_start < xc < x_end and y_start < yc < y_end:
+                # if not (x2 < x_start or x1 >= x_end or y2 < y_start or y1 >= y_end):
                     new_xc = (xc - x_start) / block_W
                     new_yc = (yc - y_start) / block_H
                     new_w = w / block_W
                     new_h = h / block_H
 
-                    if xc < x_start:
-                        new_xc = new_xc - 1
-                    if yc < y_start:
-                        new_yc = new_yc - 1
+                    if not (0 < new_xc < 1 and 0 < new_yc < 1 and 0 < new_w < 1 and 0 < new_h < 1):
+                        continue
+                    
+                    # if xc < x_start:
+                    #     new_xc = new_xc - 1
+                    # if yc < y_start:
+                    #     new_yc = new_yc - 1
 
                     block_bboxes.append([0, new_xc, new_yc, new_w, new_h])
 
@@ -57,10 +61,10 @@ def get_blocks_and_bboxes(image, bboxes):
     return output_blocks, output_bboxes
 
 if __name__ == '__main__':
-    block_save_path = '/home/wiser-renjie/datasets/test_partial/test/images'
-    label_save_path = '/home/wiser-renjie/datasets/test_partial/test/labels'
-    img_root = '/home/wiser-renjie/datasets/temp/test/images'
-    label_root = '/home/wiser-renjie/datasets/temp/test/labels'
+    block_save_path = '/home/wiser-renjie/datasets/test_partial/val/images'
+    label_save_path = '/home/wiser-renjie/datasets/test_partial/val/labels'
+    img_root = '/home/wiser-renjie/datasets/test_full/val/images'
+    label_root = '/home/wiser-renjie/datasets/test_full/val/labels'
 
     idx = 1
     for filename in sorted(os.listdir(img_root)):

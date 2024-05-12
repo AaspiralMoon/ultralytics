@@ -88,12 +88,13 @@ def plot_bbox(img, bbox, color=(0, 255, 0), thickness=2):
 if __name__ == '__main__':
     result_root = '/home/wiser-renjie/projects/yolov8/my/runs/detect/'
     save_path = osp.join(result_root, 'predict'+get_idx(result_root))
-    img_path = '/home/wiser-renjie/remote_datasets/cityscapes/leftImg8bit_sequence/train/jena/jena_000066_000002_leftImg8bit.png'
+    img_path = '/home/wiser-renjie/remote_datasets/traffic/video1/00000001.jpg'
     
     img = load_image(img_path, (2048, 1024))
-    blocks = split_image(img)
+    blocks = split_image(img, pad=0)
     
-    Yolox = YOLO('yolov8x.pt')
+    # Yolox = YOLO('yolov8x.pt')
+    Yolox = YOLO('/home/wiser-renjie/projects/yolov8/my/runs/detect/train8/weights/best.pt')
     
     results = Yolox.predict(blocks, save=True, imgsz=blocks[0].shape[0], conf=0.5)
     

@@ -11,14 +11,14 @@ def plot_bbox(img, bbox, color=(0, 255, 0), thickness=2):
 # Load a pretrained YOLOv8n model
 model = YOLO('yolov8x.pt')
 
-img = cv2.imread('test_combined.jpg')
+img = cv2.imread('/home/wiser-renjie/remote_datasets/cityscapes/leftImg8bit_sequence/train/jena/jena_000066_000002_leftImg8bit.png')
 
 results = model.predict(img, save=True, imgsz=(1024, 2048), conf=0.5)
 
-bboxes = results[0].boxes.xyxy.cpu().numpy()
-scores = results[0].boxes.conf.cpu().numpy()
+# bboxes = results[0].boxes.xyxy.cpu().numpy()
+# scores = results[0].boxes.conf.cpu().numpy()
 
-for bbox in bboxes:
-    img = plot_bbox(img, bbox)
+# for bbox in bboxes:
+#     img = plot_bbox(img, bbox)
 
-cv2.imwrite('test2.jpg', img)
+# cv2.imwrite('test2.jpg', img)

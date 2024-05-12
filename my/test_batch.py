@@ -1,6 +1,7 @@
 import cv2
 import os
 import re
+import time
 import random
 import os.path as osp
 import numpy as np
@@ -12,7 +13,7 @@ if __name__ == '__main__':
     save_path = osp.join(result_root, 'predict'+get_idx(result_root))
     img_path = '/home/wiser-renjie/remote_datasets/cityscapes/leftImg8bit_sequence/train/jena/jena_000066_000002_leftImg8bit.png'
     
-    batch_size = 100
+    batch_size = 50
     
     imgs = []
 
@@ -23,4 +24,20 @@ if __name__ == '__main__':
 
     Yolox = YOLO('yolov8x.pt')
     
-    results = Yolox.predict(imgs, save=True, imgsz=(img.shape[0], img.shape[1]), conf=0.5)
+    # ----------- wamrup ------------
+    for i in range (10):
+        _ = Yolox.predict(imgs, save=False, imgsz=(img.shape[0], img.shape[1]), conf=0.5)
+    
+    # ----------- eval ------------
+    # batch
+    t1 = time.time()
+    _ = Yolox.predict(imgs, save=False, imgsz=(img.shape[0], img.shape[1]), conf=0.5)
+    t2 = time.time()
+    print('Batch processing {} images, total: {} ms, average: {} ms'.format(batch_size, (t2-t1)*1000, (t2-t1)*1000/batch_size))
+    
+    # loop
+    t1 = time.time()
+    for i in range(batch_size):
+        _ = Yolox.predict(img, save=False, imgsz=(img.shape[0], img.shape[1]), conf=0.5)
+    t2 = time.time()
+    print('loop processing {} images, total: {} ms, average: {} ms'.format(batch_size, (t2-t1)*1000, (t2-t1)*1000/batch_size))
