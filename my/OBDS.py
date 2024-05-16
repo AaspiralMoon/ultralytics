@@ -1,4 +1,12 @@
 import numpy as np
+from numba import jit
+from scipy.stats import wasserstein_distance
+
+# @jit
+# def _costMAD(block1, block2):
+#     block1_flat = block1.astype(np.float32).flatten()
+#     block2_flat = block2.astype(np.float32).flatten()
+#     return wasserstein_distance(block1_flat, block2_flat)
 
 def _costMAD(block1, block2):
     block1 = block1.astype(np.float32)
@@ -13,7 +21,7 @@ def _checkBounded(xval, yval, w, h, blockW, blockH):
         return False
     else:
         return True
-
+    
 def OBDS_single(img_curr, block_ref, bbox_prev):
     h, w = img_curr.shape[:2]
     

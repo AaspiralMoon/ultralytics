@@ -27,7 +27,7 @@ def letterbox(img, height=1080, width=1920,
     img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # padded rectangular
     return img, ratio, dh, dw
 
-def load_image(img_path, img_size=(2048, 1024)):
+def load_image(img_path, img_size=None):
     img0 = cv2.imread(img_path)  # BGR
     assert img0 is not None, 'Failed to load ' + img_path
 

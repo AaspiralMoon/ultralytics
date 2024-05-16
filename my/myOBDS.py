@@ -4,6 +4,7 @@ import numpy as np
 import os.path as osp
 from ultralytics import YOLO as yolo
 from OBDS import OBDS_single
+from scipy.stats import wasserstein_distance
 
 def mkdir_if_missing(d):
     if not osp.exists(d):
@@ -11,9 +12,9 @@ def mkdir_if_missing(d):
     return d
         
 if __name__ == '__main__':
-    img_root = '/home/wiser-renjie/remote_datasets/traffic/video1'
+    img_root = '/home/wiser-renjie/remote_datasets/traffic/video1_30fps'
     result_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    exp_id = 'OBDS1'
+    exp_id = 'OBDS4'
     result_path = mkdir_if_missing(osp.join(result_root, exp_id))
     
     interval = 5
@@ -26,19 +27,22 @@ if __name__ == '__main__':
         bboxes = []
         if i % interval == 0:
             results = model.predict(img, save=False, classes=[2], conf=0.5)
+            img_ref = img
             refs = results[0].boxes.xyxy.cpu().numpy().astype(np.int32)
             bboxes_prev = refs
             
         else:
             for bbox_prev, ref in zip(bboxes_prev, refs):
-                target = img[ref[1]:ref[3], ref[0]:ref[2]]
+                target = img_ref[ref[1]:ref[3], ref[0]:ref[2]]
                 box = OBDS_single(img, target, bbox_prev)
                 bboxes.append(box)            
             bboxes_prev = bboxes
-            
+        color = (0, 0, 255) if i % interval == 0 else (255, 0, 0)
+        bboxes = refs if i % interval == 0 else bboxes
+        
         # Draw bounding boxes
         for box in bboxes:
             x1, y1, x2, y2 = [int(v) for v in box]
-            cv2.rectangle(img, (x1, y1), (x2, y2), (255, 0, 0), 2)
+            cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
         
         cv2.imwrite(osp.join(result_path, filename), img)
