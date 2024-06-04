@@ -74,9 +74,9 @@ if __name__ == '__main__':
     blocks, coordinates = split_image(img, block_size=256, block_dim=(8, 16))
     
     # Yolox = YOLO('yolov8x.pt')
-    Yolox = YOLO('yolov8x.pt')
+    Yolox = YOLO('/home/wiser-renjie/projects/yolov8/my/runs/detect/train8/weights/best.pt')
     
-    preds = Yolox.predict(blocks, save=False, classes=[2], imgsz=blocks[0].shape[:2], conf=0.5)
+    preds = Yolox.predict(blocks, save=False, classes=[0], imgsz=blocks[0].shape[:2], conf=0.5)
 
     results = []
     for pred in preds:
@@ -84,4 +84,4 @@ if __name__ == '__main__':
         results.append(bboxes)
         
     img_combined = map_results(img, results, coordinates)
-    cv2.imwrite('test_combined.jpg', img_combined)
+    cv2.imwrite('test_combined2.jpg', img_combined)

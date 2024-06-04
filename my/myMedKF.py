@@ -8,7 +8,7 @@ from utils import STrack
 from myMedianTracker import mkdir_if_missing, xyxy2xywh, transform_bbox
 
 if __name__ == '__main__':
-    img_root = '/home/wiser-renjie/remote_datasets/traffic/video3_30fps'
+    img_root = '/home/wiser-renjie/remote_datasets/traffic/video1_30fps'
     # img_root = '/home/wiser-renjie/remote_datasets/MOT17/MOT17-04-SDP/img1'
     result_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
     exp_id = 'test'

@@ -129,7 +129,7 @@ model = YOLO('yolov8x.pt')
 
 img = cv2.imread('/home/wiser-renjie/remote_datasets/wildtrack/datasets_combined/train/images/C7_00001360.png')
 
-results = model.predict(img, save_txt=False, save=True, classes=[0], imgsz=640, conf=0.5)
+results = model.predict(img, save_txt=False, save=False, classes=[0], imgsz=640, conf=0.5)
 
 bboxes = results[0].boxes.xyxy.cpu().numpy()
 scores = results[0].boxes.conf.cpu().numpy()

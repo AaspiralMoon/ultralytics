@@ -30,7 +30,7 @@ def create_video_from_folder(folder_path, output_file, fps):
     out.release()
 
 # Example usage:
-folder_path = "/home/wiser-renjie/projects/yolov8/my/runs/my/cam7"  # Replace with the path to your folder
-output_file = "/home/wiser-renjie/projects/yolov8/my/cam7.mp4"
+folder_path = "/home/wiser-renjie/projects/yolov8/my/runs/my/video1_30fps"  # Replace with the path to your folder
+output_file = "/home/wiser-renjie/projects/yolov8/my/video1_30fps.mp4"
 fps = 30  # Frames per second
 create_video_from_folder(folder_path, output_file, fps)
