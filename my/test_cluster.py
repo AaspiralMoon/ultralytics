@@ -107,37 +107,41 @@ def dbscan_clustering(bboxes):
         x1, y1, x2, y2 = bbox
         tid_list.append(tid)
         tid += 1
-        centroid_list.append((np.array([(x1 + x2) / 2, (y1 + y2) / 2]),[x1, y1, x2, y2]))
+        centroid_list.append((np.array([(x1 + x2) / 2, (y1 + y2) / 2]), [x1, y1, x2, y2]))
 
-    cluster_label = modified_dbscan(centroid_list, 100, 3, 0.2)
+    cluster_label = modified_dbscan(centroid_list, 200, 3, 0.1)
     
     cluster_dic = {}
+    cluster_bboxes = {}
     cluster_num = 0
     for idx, each in enumerate(cluster_label):
         if each != -1 and each not in cluster_dic.keys():
             cluster_dic[each]=[tid_list[idx]]
+            cluster_bboxes[each] = [bboxes[idx]]
             cluster_num += 1
         else:
             if each != -1:
                 cluster_dic[each].append(tid_list[idx])
+                cluster_bboxes[each].append(bboxes[idx])
             else:
                 cluster_num += 1
-    return cluster_dic, cluster_num
+    return cluster_bboxes, cluster_dic, cluster_num
 
-# Load a pretrained YOLOv8n model
-model = YOLO('yolov8x.pt')
+if __name__ == '__main__':
+    # Load a pretrained YOLOv8n model
+    model = YOLO('yolov8x.pt')
 
-img = cv2.imread('/home/wiser-renjie/remote_datasets/wildtrack/datasets_combined/train/images/C7_00001360.png')
+    img = cv2.imread('/home/wiser-renjie/remote_datasets/wildtrack/decoded_images/cam7/00001760.jpg')
 
-results = model.predict(img, save_txt=False, save=False, classes=[0], imgsz=640, conf=0.5)
+    results = model.predict(img, save_txt=False, save=True, classes=[0], imgsz=(1080, 1920), conf=0.5)
 
-bboxes = results[0].boxes.xyxy.cpu().numpy()
-scores = results[0].boxes.conf.cpu().numpy()
+    bboxes = results[0].boxes.xyxy.cpu().numpy()
+    scores = results[0].boxes.conf.cpu().numpy()
 
-t1 = time.time()
-cluster_dic, cluster_num = dbscan_clustering(bboxes)
-t2 = time.time()
-print(f'cluster time: {(t2-t1)*1000} ms')
+    t1 = time.time()
+    cluster_bboxes, cluster_dic, cluster_num = dbscan_clustering(bboxes)
+    t2 = time.time()
+    print(f'cluster time: {(t2-t1)*1000} ms')
 
-print(cluster_dic, cluster_num)
+    print(cluster_bboxes, cluster_dic, cluster_num)
 

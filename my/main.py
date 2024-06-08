@@ -5,38 +5,18 @@ import time
 import numpy as np
 from ultralytics import YOLO
 from test_cluster import dbscan_clustering
-from myMedianTracker import xyxy2xywh, mkdir_if_missing, transform_bbox
-from utils import STrack
+from myMedianTracker import mkdir_if_missing, transform_bbox
+from utils import STrack, tlwh2tlbr, tlbr2tlwh, tlwh2xywhn, detection_rate_adjuster, compute_union, bbox_to_blocks, merge_bboxes, revert_bboxes, check_boundary
+from test_merge import get_merge_info, get_merge_img
 
-
-def tlwh2xywhn(x, H, W):  
-    y = np.empty_like(x)
-    if y.size != 0:
-        y[..., 0] = (x[..., 0] + x[..., 2] / 2) / W
-        y[..., 1] = (x[..., 1] + x[..., 3] / 2) / H
-        y[..., 2] = x[..., 2] / W
-        y[..., 3] = x[..., 3] / H
-    return y
-
-def detection_rate_adjuster(cluster_num):
-    if cluster_num > 4 :
-        detection_rate = 8
-    elif cluster_num > 3:
-        detection_rate = 9
-    elif cluster_num > 2:
-        detection_rate = 10
-    else:
-        detection_rate = 11
-    return detection_rate
 
 if __name__ == '__main__':
-    img_root = '/home/wiser-renjie/remote_datasets/traffic/video1_30fps'
+    img_root = '/home/wiser-renjie/remote_datasets/wildtrack/decoded_images/cam7'
     save_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    cam_id = 'video1_30fps'
+    cam_id = 'cam7'
     save_path = mkdir_if_missing(osp.join(save_root, cam_id))
     
     interval = 10
-    light_track_frames = 3
     
     model = YOLO('yolov8x.pt')
     tracker = cv2.legacy.MultiTracker_create()
@@ -58,18 +38,23 @@ if __name__ == '__main__':
         
         if i % interval == 0:
             trackers.clear()
-            results = model.predict(img, save_txt=False, save=False, classes=[2], imgsz=640, conf=0.5)
+            results = model.predict(img, save_txt=False, save=False, classes=[0], imgsz=640, conf=0.5)
             bboxes = results[0].boxes.xyxy.cpu().numpy().astype(np.int32)
             scores = results[0].boxes.conf.cpu().numpy().astype(np.float32)
             
-            # cluster_dic, cluster_num = dbscan_clustering(bboxes)
+            cluster_bboxes, cluster_dic, cluster_num = dbscan_clustering(bboxes)
             # interval = detection_rate_adjuster(cluster_num)
             # print(f'Updated interval to {interval}')
             
-            bboxes = xyxy2xywh(bboxes)
+            if cluster_dic:
+                hard_regions = [compute_union(cluster_bboxes[x], (H, W)) for x in cluster_bboxes]
+                
+                packed_img, packed_rect = get_merge_info(hard_regions)
             
-            dets = np.array([STrack(tlwh) for tlwh in bboxes], dtype=object)
-            
+                bboxes = check_boundary(bboxes, hard_regions)
+                
+            bboxes = tlbr2tlwh(bboxes)
+                    
             t1 = time.time()
             for bbox in bboxes:
                 x1, y1, w, h = bbox
@@ -77,51 +62,34 @@ if __name__ == '__main__':
                 tracker.init(img, (x1, y1, w, h))
                 trackers.append(tracker)
             t2 = time.time()
-            print('Init time: {} ms\n'.format((t2-t1)*1000))
+            # print('Init time: {} ms\n'.format((t2-t1)*1000))
             
         else:
-            if i % interval <= light_track_frames:
-                t3 = time.time()
+            tracker_bboxes = []
+            detector_bboxes = []
+        
+            if cluster_dic:
+                merged_img = get_merge_img(img, packed_img, packed_rect)
+                results = model.predict(merged_img, save_txt=False, save=True, classes=[0], imgsz=(merged_img.shape[0], merged_img.shape[1]), conf=0.5)
+                detector_bboxes = results[0].boxes.xyxy.cpu().numpy().astype(np.int32)
                 
-                bboxes = []
+                detector_bboxes = revert_bboxes(detector_bboxes, packed_rect)
+            
+            for j, tracker in enumerate(trackers):
+                ok, out = tracker.update(img)
+                tracker_bboxes.append(out)
                 
-                for j, tracker in enumerate(trackers):
-                    ok, bbox = tracker.update(img)
-                    if not ok:
-                        dets[j].predict()
-                        bbox = dets[j].bbox
-                    bboxes.append(bbox)
-                    
-                bboxes = np.array(bboxes)
-                
-                t4 = time.time()
-                print('Light Tracker: {} ms\n'.format((t4-t3)*1000))
-                
-                for bbox, det in zip(bboxes, dets):
-                    det.predict()
-                    det.update(bbox)
-                    
-            else:
-                bboxes = []
-                for det in dets:
-                    det.predict()
-                    bbox = det.bbox
-                    # det.update(bbox)
-                    bboxes.append(bbox)
-                bboxes = np.array(bboxes)
+            tracker_bboxes = np.array(tracker_bboxes)
+            
     
-    
+            bboxes = merge_bboxes(detector_bboxes, tracker_bboxes)
+        
         bboxes = transform_bbox(bboxes, H0, W0, H, W)
         
         if i % interval == 0: 
             color = (0, 0, 255)                # red for detector
-            print('red')
-        elif i % interval <= light_track_frames:
-            color = (255, 0, 0)                # blue for light tracker
-            print('blue')
         else:
-            color = (0, 255, 0)                # green for kalman
-            print('green')
+            color = (255, 0, 0)                # blue for light tracker
         # Draw bounding boxes
         for bbox in bboxes.astype(np.int32):
             x1, y1, w, h = bbox 

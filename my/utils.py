@@ -73,45 +73,115 @@ class STrack(object):
         ret = np.asarray(tlwh).copy()
         ret[2:] += ret[:2]
         return ret
-    
+
+def tlwh2tlbr(x):
+    assert x.shape[-1] == 4, f"input shape last dimension expected 4 but input shape is {x.shape}"
+    y = np.empty_like(x)
+    if y.size != 0:
+        y[..., 0] = x[..., 0]
+        y[..., 1] = x[..., 1]
+        y[..., 2] = x[..., 0] + x[..., 2]
+        y[..., 3] = x[..., 1] + x[..., 3]
+    return y
+
+def tlbr2tlwh(x):
+    assert x.shape[-1] == 4, f"input shape last dimension expected 4 but input shape is {x.shape}"
+    y = np.empty_like(x)
+    if y.size != 0:
+        y[..., 0] = x[..., 0]
+        y[..., 1] = x[..., 1]
+        y[..., 2] = x[..., 2] - x[..., 0]  # width
+        y[..., 3] = x[..., 3] - x[..., 1]  # height
+    return y
+
 def compute_union(bboxes, img_size):      # img_size = (H, W)
     if not bboxes:
         return None
     
     bboxes = np.array(bboxes)
-    x1 = np.min(bboxes[:, 0])
-    y1 = np.min(bboxes[:, 1])
-    x2 = np.max(bboxes[:, 2])
-    y2 = np.max(bboxes[:, 3])
+    x1 = np.min(bboxes[..., 0])
+    y1 = np.min(bboxes[..., 1])
+    x2 = np.max(bboxes[..., 2])
+    y2 = np.max(bboxes[..., 3])
     
+    H, W = img_size
     # Clip the union bbox to be within the image size
     x1 = max(0, x1)
     y1 = max(0, y1)
-    x2 = min(img_size[1], x2)
-    y2 = min(img_size[0], y2)
+    x2 = min(W, x2)
+    y2 = min(H, y2)
     
-    return (x1, y1, x2, y2)
+    return [x1, y1, x2, y2]
 
 def bbox_to_blocks(union_region, block_size):
     x1, y1, x2, y2 = union_region
-    block_w, block_h = block_size
 
     # Calculate block indices
-    start_block_x = x1 // block_w
-    start_block_y = y1 // block_h
-    end_block_x = (x2 + block_w - 1) // block_w  # ceil division
-    end_block_y = (y2 + block_h - 1) // block_h  # ceil division
+    start_block_x = x1 // block_size
+    start_block_y = y1 // block_size
+    end_block_x = (x2 + block_size - 1) // block_size  # ceil division
+    end_block_y = (y2 + block_size - 1) // block_size  # ceil division
 
-    # # Generate list of block coordinates
-    # blocks = []
-    # for bx in range(start_block_x, end_block_x):
-    #     for by in range(start_block_y, end_block_y):
-    #         blocks.append((bx, by))
     block_region = (block_size * start_block_x, block_size * start_block_y, block_size * end_block_x, block_size * end_block_y)
     
     return block_region
 
-def merge_region(img, block_regions):
-    if len(block_regions) == 1:
-        return block_regions[0]
+def tlwh2xywhn(x, H, W):  
+    y = np.empty_like(x)
+    if y.size != 0:
+        y[..., 0] = (x[..., 0] + x[..., 2] / 2) / W
+        y[..., 1] = (x[..., 1] + x[..., 3] / 2) / H
+        y[..., 2] = x[..., 2] / W
+        y[..., 3] = x[..., 3] / H
+    return y
+
+def detection_rate_adjuster(cluster_num):
+    if cluster_num > 4 :
+        detection_rate = 8
+    elif cluster_num > 3:
+        detection_rate = 9
+    elif cluster_num > 2:
+        detection_rate = 10
+    else:
+        detection_rate = 11
+    return detection_rate
+
+def merge_bboxes(bboxes1, bboxes2):
+    bboxes1 = np.array(bboxes1)
+    bboxes2 = np.array(bboxes2)
     
+    if bboxes1.size == 0:
+        return bboxes2
+    if bboxes2.size == 0:
+        return bboxes1
+    return np.vstack((bboxes1, bboxes2))
+
+def revert_bboxes(detected_bboxes, packed_rectangles):
+    reverted_bboxes = []
+    for detected_bbox in detected_bboxes:
+        dx1, dy1, dx2, dy2 = detected_bbox
+        for rect in packed_rectangles:
+            px1, py1, px2, py2 = rect['x'], rect['y'], rect['x'] + rect['width'], rect['y'] + rect['height']
+            if px1 <= dx1 < px2 and py1 <= dy1 < py2:
+                ox1, oy1, ox2, oy2 = rect['original_bbox']
+                offset_x = ox1 - px1
+                offset_y = oy1 - py1
+                reverted_bboxes.append([dx1 + offset_x, dy1 + offset_y, dx2 + offset_x, dy2 + offset_y])
+                break
+    return np.array(reverted_bboxes)
+
+def check_boundary(bboxes, hard_regions):
+    
+    bboxes = np.array(bboxes)
+    hard_regions = np.array(hard_regions)
+
+    mask = np.ones(len(bboxes), dtype=bool)
+
+    bx1, by1, bx2, by2 = bboxes[..., 0], bboxes[..., 1], bboxes[..., 2], bboxes[..., 3]
+    rx1, ry1, rx2, ry2 = hard_regions[..., 0], hard_regions[..., 1], hard_regions[..., 2], hard_regions[..., 3]
+    
+    for i in range(len(hard_regions)):
+        in_region = (bx1 >= rx1[i]) & (by1 >= ry1[i]) & (bx2 <= rx2[i]) & (by2 <= ry2[i])
+        mask &= ~in_region
+
+    return bboxes[mask]

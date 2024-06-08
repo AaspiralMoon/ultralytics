@@ -16,12 +16,13 @@ def update_skyline(skyline, x, width, height):
     for i in range(width):
         skyline[x + i] = height
 
-def rectangle_packing(rectangles):
-    total_area = sum(rect['width'] * rect['height'] for rect in rectangles)
+def rectangle_packing(bboxes):
+    total_area = sum((x2 - x1) * (y2 - y1) for x1, y1, x2, y2 in bboxes)
     side_length = int(np.ceil(np.sqrt(total_area)))
     container_width = side_length
     skyline = [0] * container_width
 
+    rectangles = [{'width': x2 - x1, 'height': y2 - y1, 'original_bbox': (x1, y1, x2, y2)} for x1, y1, x2, y2 in bboxes]
     rectangles_sorted = sorted(rectangles, key=lambda r: -r['height'])
 
     container_height = 0
@@ -43,31 +44,44 @@ def rectangle_packing(rectangles):
             container_height = max(container_height, new_height)
 
     container = np.zeros((container_height, container_width, 3), dtype=np.uint8)
-    for rect in rectangles_sorted:
-        container[rect['y']:rect['y']+rect['height'], rect['x']:rect['x']+rect['width']] = (255, 255, 255)
-        cv2.rectangle(container, (rect['x'], rect['y']), (rect['x'] + rect['width'], rect['y'] + rect['height']), (0, 0, 0), 1)
+    # for rect in rectangles_sorted:
+    #     container[rect['y']:rect['y']+rect['height'], rect['x']:rect['x']+rect['width']] = (255, 255, 255)
+    #     cv2.rectangle(container, (rect['x'], rect['y']), (rect['x'] + rect['width'], rect['y'] + rect['height']), (0, 0, 0), 1)
 
-    return container
+    return container, rectangles_sorted
 
+def get_merge_info(bboxes):
+    packed_img, packed_rect = rectangle_packing(bboxes)
+
+    return packed_img, packed_rect
+
+def get_merge_img(img, packed_img, packed_rect):
+    merged_img = np.zeros_like(packed_img)
+
+    for rect in packed_rect:
+        x1, y1, x2, y2 = rect['original_bbox']
+        sub_img = img[y1:y2, x1:x2]
+        merged_img[rect['y']:rect['y']+rect['height'], rect['x']:rect['x']+rect['width']] = sub_img
+
+    return merged_img
+    
 def save_image(container, output_path):
     cv2.imwrite(output_path, container)
 
-def crop_to_fit(container, rectangles):
-    max_x = max(rect['x'] + rect['width'] for rect in rectangles)
-    max_y = max(rect['y'] + rect['height'] for rect in rectangles)
-    return container[:max_y, :max_x]
+if __name__ == '__main__':
+    # 示例图像
+    img = cv2.imread("/home/wiser-renjie/remote_datasets/wildtrack/datasets_combined/train/images/C7_00001300.png")
 
-# 定义矩形框，包含宽度和高度
-rectangles = [
-    {'width': 160, 'height': 20},
-    {'width': 140, 'height': 240},
-]
+    # 示例目标框
+    bboxes = np.array([
+        [5, 5, 250, 25],
+        [5, 5, 25, 250]
+    ])
 
-import time
-t1 = time.time()
-container = rectangle_packing(rectangles)
-container = crop_to_fit(container, rectangles)
-t2 = time.time()
-print((t2-t1)*1000)
-output_path = "packed_image_fast.png"
-save_image(container, output_path)
+    import time
+    t1 = time.time()
+    merged_img = get_merged_img(img, bboxes)
+    t2 = time.time()
+    print((t2-t1)*1000)
+    output_path = "merged_image.png"
+    save_image(merged_img, output_path)
