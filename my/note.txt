@@ -1,0 +1,6 @@
+1. merge
+2. multi-process, tracker + detector
+3. local tracker
+4. mAP
+5. cluster
+6. region overlap

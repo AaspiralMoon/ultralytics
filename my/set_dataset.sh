@@ -5,3 +5,4 @@ sshfs xur86@130.113.68.165:/nfs/u40/xur86/projects/yolov5/data/images/ /home/wis
 sshfs xur86@130.113.68.165:/nfs/u40/xur86/projects/DeepScale/datasets/MOT17/images/train/ /home/wiser-renjie/remote_datasets/MOT17/
 sshfs xur86@130.113.68.165:/nfs/u40/xur86/datasets/MOT17_Det_YOLO/ /home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/
 sshfs xur86@130.113.68.165:/nfs/u40/xur86/datasets/wildtrack /home/wiser-renjie/remote_datasets/wildtrack
+# XRJmcmaster96

@@ -46,7 +46,7 @@ if __name__ == '__main__':
     
     model = YOLO('yolov8x.pt')
 
-    H = 1088
+    H = 1152
     W = 1920
     block_size = 128
     

@@ -1,12 +1,28 @@
-from ultralytics import YOLO
+import os
+import json
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
 
-if __name__ == '__main__':
-    model_path = '/home/wiser-renjie/projects/yolov8/my/runs/detect/train8/weights/best.pt'
-    model = YOLO(model_path)  # load a custom model
+def load_annotations(annotations_path):
+    coco = COCO(annotations_path)
+    return coco
 
-    # Validate the model
-    metrics = model.val()  # no arguments needed, dataset and settings remembered
-    metrics.box.map    # map50-95
-    metrics.box.map50  # map50
-    metrics.box.map75  # map75
-    metrics.box.maps   # a list contains map50-95 of each category
+def load_detections(detections_path):
+    with open(detections_path, 'r') as f:
+        detections = json.load(f)
+    return detections
+
+def evaluate(coco, detections):
+    coco_dt = coco.loadRes(detections)
+    coco_eval = COCOeval(coco, coco_dt, 'bbox')
+    coco_eval.evaluate()
+    coco_eval.accumulate()
+    coco_eval.summarize()
+
+if __name__ == "__main__":
+    annotations_path = '/home/wiser-renjie/projects/yolov8/my/runs/detect/predict201/gt.json'  # Path to your ground truth annotations in COCO format
+    detections_path = '/home/wiser-renjie/projects/yolov8/my/runs/detect/predict201/detections.json'    # Path to your precomputed results in COCO format
+
+    coco = load_annotations(annotations_path)
+    detections = load_detections(detections_path)
+    evaluate(coco, detections)

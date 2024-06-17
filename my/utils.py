@@ -1,3 +1,4 @@
+import cv2
 import numpy as np
 from kalman_filter import KalmanFilter
 
@@ -75,23 +76,49 @@ class STrack(object):
         return ret
 
 def tlwh2tlbr(x):
-    assert x.shape[-1] == 4, f"input shape last dimension expected 4 but input shape is {x.shape}"
     y = np.empty_like(x)
-    if y.size != 0:
+    
+    if y.size == 0:
+        return y
+    
+    if x.shape[1] == 4:  # [x, y, w, h]
         y[..., 0] = x[..., 0]
         y[..., 1] = x[..., 1]
         y[..., 2] = x[..., 0] + x[..., 2]
         y[..., 3] = x[..., 1] + x[..., 3]
+    elif x.shape[1] == 6: # [cls, x, y, w, h, conf]
+        y[..., 0] = x[..., 0]
+        y[..., 1] = x[..., 1]
+        y[..., 2] = x[..., 2]
+        y[..., 3] = x[..., 1] + x[..., 3]
+        y[..., 4] = x[..., 2] + x[..., 4]
+        y[..., 5] = x[..., 5]
+    else:
+        raise NotImplementedError("Input shape not supported")
+    
     return y
 
 def tlbr2tlwh(x):
-    assert x.shape[-1] == 4, f"input shape last dimension expected 4 but input shape is {x.shape}"
     y = np.empty_like(x)
-    if y.size != 0:
+    
+    if y.size == 0:
+        return y
+    
+    if x.shape[1] == 4:  # [x1, y1, x2, y2]
         y[..., 0] = x[..., 0]
         y[..., 1] = x[..., 1]
-        y[..., 2] = x[..., 2] - x[..., 0]  # width
+        y[..., 2] = x[..., 2] - x[..., 0]
         y[..., 3] = x[..., 3] - x[..., 1]  # height
+    elif x.shape[1] == 6:  # [cls, x1, y1, x2, y2, conf]
+        y[..., 0] = x[..., 0]
+        y[..., 1] = x[..., 1]
+        y[..., 2] = x[..., 2]
+        y[..., 3] = x[..., 3] - x[..., 1]  # width
+        y[..., 4] = x[..., 4] - x[..., 2]  # height
+        y[..., 5] = x[..., 5]
+    else:
+        raise NotImplementedError("Input shape not supported")
+    
     return y
 
 def compute_union(bboxes, img_size):      # img_size = (H, W)
@@ -112,6 +139,11 @@ def compute_union(bboxes, img_size):      # img_size = (H, W)
     y2 = min(H, y2)
     
     return [x1, y1, x2, y2]
+
+# def compute_union(bboxes1, bboxes2, img_size):      # img_size = (H, W)
+
+    
+#     return [x1, y1, x2, y2]
 
 def bbox_to_blocks(union_region, block_size):
     x1, y1, x2, y2 = union_region
@@ -185,3 +217,32 @@ def check_boundary(bboxes, hard_regions):
         mask &= ~in_region
 
     return bboxes[mask]
+
+def plot_cluster(img, hard_blocks):
+    overlay = img.copy()
+    alpha = 0.3
+    
+    for x1, y1, x2, y2 in hard_blocks:
+        cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 0, 255), -1)
+    
+    cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0, img)
+    
+    return img
+
+def plot_grid(img, block_size=128):
+    h, w, _ = img.shape
+    
+    for y in range(0, h, block_size):
+        cv2.line(img, (0, y), (w, y), (255, 0, 0), 1)
+    for x in range(0, w, block_size):
+        cv2.line(img, (x, 0), (x, h), (255, 0, 0), 1)
+    
+    return img
+
+def plot_bbox(img, bboxes, color=(0, 255, 0), thickness=2):
+    
+    for bbox in bboxes.astype(np.int32):
+        x1, y1, x2, y2 = bbox
+        cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness)
+        
+    return img
