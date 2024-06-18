@@ -1,5 +1,7 @@
+import os
 import cv2
 import numpy as np
+import os.path as osp
 from kalman_filter import KalmanFilter
 
 class STrack(object):
@@ -75,18 +77,23 @@ class STrack(object):
         ret[2:] += ret[:2]
         return ret
 
+def mkdir_if_missing(d):
+    if not osp.exists(d):
+        os.makedirs(d)
+    return d
+
 def tlwh2tlbr(x):
     y = np.empty_like(x)
     
     if y.size == 0:
         return y
     
-    if x.shape[1] == 4:  # [x, y, w, h]
+    if y.shape[1] == 4:  # [x, y, w, h]
         y[..., 0] = x[..., 0]
         y[..., 1] = x[..., 1]
         y[..., 2] = x[..., 0] + x[..., 2]
         y[..., 3] = x[..., 1] + x[..., 3]
-    elif x.shape[1] == 6: # [cls, x, y, w, h, conf]
+    elif y.shape[1] == 6: # [cls, x, y, w, h, conf]
         y[..., 0] = x[..., 0]
         y[..., 1] = x[..., 1]
         y[..., 2] = x[..., 2]
@@ -104,12 +111,12 @@ def tlbr2tlwh(x):
     if y.size == 0:
         return y
     
-    if x.shape[1] == 4:  # [x1, y1, x2, y2]
+    if y.shape[1] == 4:  # [x1, y1, x2, y2]
         y[..., 0] = x[..., 0]
         y[..., 1] = x[..., 1]
         y[..., 2] = x[..., 2] - x[..., 0]
         y[..., 3] = x[..., 3] - x[..., 1]  # height
-    elif x.shape[1] == 6:  # [cls, x1, y1, x2, y2, conf]
+    elif y.shape[1] == 6:  # [cls, x1, y1, x2, y2, conf]
         y[..., 0] = x[..., 0]
         y[..., 1] = x[..., 1]
         y[..., 2] = x[..., 2]
@@ -120,6 +127,27 @@ def tlbr2tlwh(x):
         raise NotImplementedError("Input shape not supported")
     
     return y
+
+def tlwh2xywhn(x, H, W):  
+    y = np.empty_like(x)
+    
+    if y.size == 0:
+        return y
+    
+    if y.shape[1] == 4:  # [x1, y1, w, h]
+        y[..., 0] = np.clip((x[..., 0] + x[..., 2] / 2) / W, 0, 1)
+        y[..., 1] = np.clip((x[..., 1] + x[..., 3] / 2) / H, 0, 1)
+        y[..., 2] = np.clip(x[..., 2] / W, 0, 1)
+        y[..., 3] = np.clip(x[..., 3] / H, 0, 1)
+    elif y.shape[1] == 6:  # [cls, x1, y1, w, h, conf]
+        y[..., 0] = x[..., 0]
+        y[..., 1] = np.clip((x[..., 1] + x[..., 3] / 2) / W, 0, 1)
+        y[..., 2] = np.clip((x[..., 2] + x[..., 4] / 2) / H, 0, 1)
+        y[..., 3] = np.clip(x[..., 3] / W, 0, 1)
+        y[..., 4] = np.clip(x[..., 4] / H, 0, 1)
+        y[..., 5] = x[..., 5]
+    return y
+
 
 def compute_union(bboxes, img_size):      # img_size = (H, W)
     if not bboxes:
@@ -140,6 +168,7 @@ def compute_union(bboxes, img_size):      # img_size = (H, W)
     
     return [x1, y1, x2, y2]
 
+
 # def compute_union(bboxes1, bboxes2, img_size):      # img_size = (H, W)
 
     
@@ -158,14 +187,6 @@ def bbox_to_blocks(union_region, block_size):
     
     return block_region
 
-def tlwh2xywhn(x, H, W):  
-    y = np.empty_like(x)
-    if y.size != 0:
-        y[..., 0] = (x[..., 0] + x[..., 2] / 2) / W
-        y[..., 1] = (x[..., 1] + x[..., 3] / 2) / H
-        y[..., 2] = x[..., 2] / W
-        y[..., 3] = x[..., 3] / H
-    return y
 
 def detection_rate_adjuster(cluster_num):
     if cluster_num > 4 :
@@ -191,25 +212,24 @@ def merge_bboxes(bboxes1, bboxes2):
 def revert_bboxes(detected_bboxes, packed_rectangles):
     reverted_bboxes = []
     for detected_bbox in detected_bboxes:
-        dx1, dy1, dx2, dy2 = detected_bbox
+        cls, dx1, dy1, dx2, dy2, conf = detected_bbox
         for rect in packed_rectangles:
             px1, py1, px2, py2 = rect['x'], rect['y'], rect['x'] + rect['width'], rect['y'] + rect['height']
             if px1 <= dx1 < px2 and py1 <= dy1 < py2:
                 ox1, oy1, ox2, oy2 = rect['original_bbox']
                 offset_x = ox1 - px1
                 offset_y = oy1 - py1
-                reverted_bboxes.append([dx1 + offset_x, dy1 + offset_y, dx2 + offset_x, dy2 + offset_y])
+                reverted_bboxes.append([cls, dx1 + offset_x, dy1 + offset_y, dx2 + offset_x, dy2 + offset_y, conf])
                 break
     return np.array(reverted_bboxes)
 
 def check_boundary(bboxes, hard_regions):
-    
     bboxes = np.array(bboxes)
     hard_regions = np.array(hard_regions)
 
     mask = np.ones(len(bboxes), dtype=bool)
 
-    bx1, by1, bx2, by2 = bboxes[..., 0], bboxes[..., 1], bboxes[..., 2], bboxes[..., 3]
+    bx1, by1, bx2, by2 = bboxes[..., 1], bboxes[..., 2], bboxes[..., 3], bboxes[..., 4]
     rx1, ry1, rx2, ry2 = hard_regions[..., 0], hard_regions[..., 1], hard_regions[..., 2], hard_regions[..., 3]
     
     for i in range(len(hard_regions)):

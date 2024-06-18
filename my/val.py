@@ -20,8 +20,8 @@ def evaluate(coco, detections):
     coco_eval.summarize()
 
 if __name__ == "__main__":
-    annotations_path = '/home/wiser-renjie/projects/yolov8/my/runs/detect/predict201/gt.json'  # Path to your ground truth annotations in COCO format
-    detections_path = '/home/wiser-renjie/projects/yolov8/my/runs/detect/predict201/detections.json'    # Path to your precomputed results in COCO format
+    annotations_path = '/home/wiser-renjie/projects/yolov8/my/runs/gt_wildtrack_cam7_yolov8x_1152_1920_0.3.json'  # Path to your ground truth annotations in COCO format
+    detections_path = '/home/wiser-renjie/projects/yolov8/my/runs/wildtrack_cam7_yolov8x_1152_1920_0.3.json'    # Path to your precomputed results in COCO format
 
     coco = load_annotations(annotations_path)
     detections = load_detections(detections_path)

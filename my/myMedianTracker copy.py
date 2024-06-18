@@ -20,42 +20,29 @@ def xyxy2xywh(x):
     y[..., 3] = x[..., 3] - x[..., 1]  # height
     return y
 
-def transform_bbox(bboxes, H0, W0, H, W):
-    bboxes = np.asarray(bboxes, dtype=np.float32)
-    if bboxes.size != 0:
-        scale_x = W0 / W
-        scale_y = H0 / H
-        
-        scales = np.array([scale_x, scale_y, scale_x, scale_y])
-        
-        bboxes = bboxes * scales
-
-    return bboxes
-
 if __name__ == '__main__':
     img_root = '/home/wiser-renjie/remote_datasets/wildtrack/decoded_images/cam7'
     result_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    exp_id = 'cam7_medianflow2'
+    exp_id = 'cam7_medianflow'
     result_path = mkdir_if_missing(osp.join(result_root, exp_id))
     
     interval = 10
         
     model = yolo('yolov8x.pt')
     tracker = cv2.legacy.MultiTracker_create()
+    trackers = []
     
     for i, filename in enumerate(sorted(os.listdir(img_root))):
         print('\n ----------------- Frame : {} ------------------- \n'.format(i))
         img0 = cv2.imread(osp.join(img_root, filename))
-        H0, W0 = img0.shape[:2]
         
+        H, W = 1152, 1920
+        
+        img = cv2.resize(img0, (W, H))
         img0_copy = img0.copy()
         
-        H, W = 640, 640
-        img = cv2.resize(img0, (W, H))
-        
         if i % interval == 0:
-            tracker.clear()
-            tracker = cv2.legacy.MultiTracker_create()
+            trackers.clear()
             results = model.predict(img, save=False, imgsz=(H, W), classes=[0], conf=0.5)
             # results = model.predict(img, save=False, imgsz=(H, W), conf=0.5)
             bboxes = results[0].boxes.xyxy.cpu().numpy().astype(np.int32)
@@ -64,19 +51,25 @@ if __name__ == '__main__':
             t1 = time.time()
             for bbox in bboxes:
                 x1, y1, w, h = bbox
-                tracker.add(cv2.legacy.TrackerMedianFlow_create(), img, (x1, y1, w, h))
+                tracker = cv2.legacy.TrackerMedianFlow_create()
+                tracker.init(img, (x1, y1, w, h))
+                trackers.append(tracker)
             t2 = time.time()
-            print('Init time: {} ms\n'.format((t2-t1)*1000))
+            # print('Init time: {} ms\n'.format((t2-t1)*1000))
 
         else:
+            bboxes = []
             t3 = time.time()
-            success, bboxes = tracker.update(img)
+            for j, tracker in enumerate(trackers):
+                ok, out = tracker.update(img)
+                bboxes.append(out)
+            bboxes = np.array(bboxes)
             t4 = time.time()
             print('Track time: {} ms\n'.format((t4-t3)*1000))
 
         color = (0, 0, 255) if i % interval == 0 else (255, 0, 0)
         # Draw bounding boxes
-        for bbox in transform_bbox(bboxes, H0, W0, H, W).astype(np.int32):
+        for bbox in bboxes.astype(np.int32):
             x1, y1, w, h = bbox 
             cv2.rectangle(img0_copy, (x1, y1), (x1 + w, y1 + h), color, 2)
         

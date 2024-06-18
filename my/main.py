@@ -18,7 +18,7 @@ if __name__ == '__main__':
     
     interval = 10
     
-    model = YOLO('yolov8x.pt')
+    model = YOLO('/home/wiser-renjie/projects/yolov8/my/weights/yolov8x_MOT17.pt')
     tracker = cv2.legacy.MultiTracker_create()
     trackers = []
     
@@ -34,16 +34,18 @@ if __name__ == '__main__':
         
         if i % interval == 0:
             trackers.clear()
-            results = model.predict(img, save_txt=False, save=False, classes=[0], imgsz=(img.shape[0], img.shape[1]), conf=0.2)
+            results = model.predict(img, save_txt=False, save=False, classes=[0], imgsz=(img.shape[0], img.shape[1]), conf=0.3)
             bboxes = results[0].boxes.xyxy.cpu().numpy().astype(np.int32)
-            scores = results[0].boxes.conf.cpu().numpy().astype(np.float32)
-            clses = results[0].boxes.cls.cpu().numpy()
+            confs = results[0].boxes.conf.cpu().numpy().astype(np.float32)
+            clses = results[0].boxes.cls.cpu().numpy().astype(np.int32)
             
+            bboxes = np.hstack((clses[:, None], bboxes, confs[:, None]))
+
             for bbox in bboxes:
-                x1, y1, x2, y2 = bbox.astype(np.int32) 
+                _, x1, y1, x2, y2, _ = bbox.astype(np.int32) 
                 cv2.rectangle(img_copy, (x1, y1), (x2, y2), (0, 0, 255), 2)
                 
-            cluster_bboxes, cluster_dic, cluster_num = dbscan_clustering(bboxes)
+            cluster_bboxes, cluster_dic, cluster_num = dbscan_clustering(bboxes[:, 1:5])
             # interval = detection_rate_adjuster(cluster_num)
             # print(f'Updated interval to {interval}')
             
@@ -59,7 +61,7 @@ if __name__ == '__main__':
                     
             t1 = time.time()
             for bbox in bboxes:
-                x1, y1, w, h = bbox
+                _, x1, y1, w, h, _ = bbox
                 tracker = cv2.legacy.TrackerMedianFlow_create()
                 tracker.init(img, (x1, y1, w, h))
                 trackers.append(tracker)
@@ -72,18 +74,24 @@ if __name__ == '__main__':
         
             if cluster_dic:
                 merged_img = get_merge_img(img, packed_img, packed_rect)
-                results = model.predict(merged_img, save_txt=False, save=True, classes=[0], imgsz=(merged_img.shape[0], merged_img.shape[1]), conf=0.2)
+                results = model.predict(merged_img, save_txt=False, save=False, classes=[0], imgsz=(merged_img.shape[0], merged_img.shape[1]), conf=0.3)
                 detector_bboxes = results[0].boxes.xyxy.cpu().numpy().astype(np.int32)
-                
+                detector_confs = results[0].boxes.conf.cpu().numpy().astype(np.float32)
+                detector_clses = results[0].boxes.cls.cpu().numpy().astype(np.int32)
+            
+                detector_bboxes = np.hstack((detector_clses[:, None], detector_bboxes, detector_confs[:, None]))
                 detector_bboxes = revert_bboxes(detector_bboxes, packed_rect)
                 detector_bboxes = tlbr2tlwh(detector_bboxes)
                 
             for j, tracker in enumerate(trackers):
                 ok, out = tracker.update(img)
-                tracker_bboxes.append(out)
+                x1, y1, w, h = out
+                cls = clses[j]
+                conf = confs[j]
+                tracker_bboxes.append([cls, x1, y1, w, h, conf])
 
             tracker_bboxes = np.array(tracker_bboxes)
-              
+            
             bboxes = merge_bboxes(detector_bboxes, tracker_bboxes)
 
             # cluster_bboxes, cluster_dic, cluster_num = dbscan_clustering(bboxes)
@@ -94,11 +102,11 @@ if __name__ == '__main__':
             #     packed_img, packed_rect = get_merge_info(hard_blocks)
                 
             for tracker_bbox in tracker_bboxes:
-                x1, y1, w, h = tracker_bbox.astype(np.int32) 
+                _, x1, y1, w, h, _ = tracker_bbox.astype(np.int32) 
                 cv2.rectangle(img_copy, (x1, y1), (x1 + w, y1 + h), (0, 255, 0), 2)
             
             for detector_bbox in detector_bboxes:
-                x1, y1, w, h = detector_bbox.astype(np.int32) 
+                _, x1, y1, w, h, _ = detector_bbox.astype(np.int32) 
                 cv2.rectangle(img_copy, (x1, y1), (x1 + w, y1 + h), (255, 0, 0), 2)
         
         if cluster_dic:
@@ -108,6 +116,6 @@ if __name__ == '__main__':
         # bboxes = tlwh2xywhn(bboxes, H0, W0)
         # bboxes = np.insert(bboxes, 0, 0, axis=1)
         
-        cv2.imwrite(osp.join(save_path, img_filename.replace('png', 'jpg')), img_copy)
+        # cv2.imwrite(osp.join(save_path, img_filename.replace('png', 'jpg')), img_copy)
         
-        # np.savetxt(osp.join(save_path, img_filename.replace('png', 'txt')), bboxes)
+        np.savetxt(osp.join(save_path, img_filename.replace('jpg', 'txt')), tlwh2xywhn(bboxes, H, W), fmt='%.6f')
