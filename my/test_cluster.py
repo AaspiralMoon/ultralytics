@@ -109,7 +109,7 @@ def dbscan_clustering(bboxes):
         tid += 1
         centroid_list.append((np.array([(x1 + x2) / 2, (y1 + y2) / 2]), [x1, y1, x2, y2]))
 
-    cluster_label = modified_dbscan(centroid_list, 200, 3, 0.1)
+    cluster_label = modified_dbscan(centroid_list, 200, 2, 0.1)
     
     cluster_dic = {}
     cluster_bboxes = {}

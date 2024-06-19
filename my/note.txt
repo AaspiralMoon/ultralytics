@@ -4,3 +4,12 @@
 4. mAP
 5. cluster
 6. region overlap
+
+
+version 1 (2024.6.18)
+1. interval K=10 fixed
+2. clustering fixed
+3. no fix for tracker
+4. no fix for new objects
+5. no fix for disappearing objects
+6. no fix for boundary conflicts

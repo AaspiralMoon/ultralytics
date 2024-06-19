@@ -13,7 +13,7 @@ from test_merge import get_merge_info, get_merge_img
 if __name__ == '__main__':
     img_root = '/home/wiser-renjie/remote_datasets/wildtrack/decoded_images/cam7'
     save_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    cam_id = 'cam7'
+    cam_id = 'wildtrack_cam7_my_1152_1920_0.3_i10_TOP3000'
     save_path = mkdir_if_missing(osp.join(save_root, cam_id))
     
     interval = 10
@@ -23,6 +23,9 @@ if __name__ == '__main__':
     trackers = []
     
     for i, img_filename in enumerate(sorted(os.listdir(img_root))):
+        print('\n ----------------- Frame : {} ------------------- \n'.format(img_filename))
+        if i == 3000:
+            break
         
         img_path = osp.join(img_root, img_filename)
         

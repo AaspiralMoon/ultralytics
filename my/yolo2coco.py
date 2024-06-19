@@ -85,16 +85,16 @@ def yolo_to_coco(yolo_results_dir, output_file, img_size, is_gt=False):
 
 # 生成包含 GT 的 COCO 格式 JSON
 yolo_to_coco(
-    '/home/wiser-renjie/projects/yolov8/my/runs/wildtrack_cam7_yolov8x_1152_1920_0.3', 
-    '/home/wiser-renjie/projects/yolov8/my/runs/wildtrack_cam7_yolov8x_1152_1920_0.3.json',
+    '/home/wiser-renjie/projects/yolov8/my/runs/my/wildtrack_cam7_yolov8x_1152_1920_0.3_TOP3000', 
+    '/home/wiser-renjie/projects/yolov8/my/runs/my/jsons/gt_wildtrack_cam7_yolov8x_1152_1920_0.3_TOP3000.json',
     img_size=(1152, 1920),
     is_gt=True
 )
 
 # 生成包含检测结果的 JSON
 yolo_to_coco(
-    '/home/wiser-renjie/projects/yolov8/my/runs/wildtrack_cam7_yolov8x_1152_1920_0.3', 
-    '/home/wiser-renjie/projects/yolov8/my/runs/wildtrack_cam7_yolov8x_1152_1920_0.3.json',
+    '/home/wiser-renjie/projects/yolov8/my/runs/my/wildtrack_cam7_my_1152_1920_0.3_i10_TOP3000', 
+    '/home/wiser-renjie/projects/yolov8/my/runs/my/jsons/wildtrack_cam7_my_1152_1920_0.3_i10_TOP3000.json',
     img_size=(1152, 1920),
     is_gt=False
 )
