@@ -21,7 +21,7 @@ def evaluate(coco, detections):
 
 if __name__ == "__main__":
     annotations_path = '/home/wiser-renjie/projects/yolov8/my/runs/my/jsons/gt_wildtrack_cam7_yolov8x_1152_1920_0.3_TOP3000.json'  # Path to your ground truth annotations in COCO format
-    detections_path = '/home/wiser-renjie/projects/yolov8/my/runs/my/jsons/wildtrack_cam7_medianflow_1152_1920_0.3_i10_TOP3000.json'    # Path to your precomputed results in COCO format
+    detections_path = '/home/wiser-renjie/projects/yolov8/my/runs/my/jsons/wildtrack_cam7_my_yolol_1152_1920_0.3_i10_TOP3000.json'    # Path to your precomputed results in COCO format
 
     coco = load_annotations(annotations_path)
     detections = load_detections(detections_path)

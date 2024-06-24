@@ -13,15 +13,16 @@ from test_merge import get_merge_info, get_merge_img
 if __name__ == '__main__':
     img_root = '/home/wiser-renjie/remote_datasets/wildtrack/decoded_images/cam7'
     save_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    cam_id = 'wildtrack_cam7_my_1152_1920_0.3_i10_TOP3000'
+    cam_id = 'wildtrack_cam7_my_yolol_1152_1920_0.3_i10_TOP3000'
     save_path = mkdir_if_missing(osp.join(save_root, cam_id))
     
     interval = 10
     
-    model = YOLO('/home/wiser-renjie/projects/yolov8/my/weights/yolov8x_MOT17.pt')
+    model = YOLO('/home/wiser-renjie/projects/yolov8/my/weights/yolov8l_MOT17.pt')
     tracker = cv2.legacy.MultiTracker_create()
     trackers = []
     
+    detector_time_list = []
     for i, img_filename in enumerate(sorted(os.listdir(img_root))):
         print('\n ----------------- Frame : {} ------------------- \n'.format(img_filename))
         if i == 3000:
@@ -41,7 +42,8 @@ if __name__ == '__main__':
             bboxes = results[0].boxes.xyxy.cpu().numpy().astype(np.int32)
             confs = results[0].boxes.conf.cpu().numpy().astype(np.float32)
             clses = results[0].boxes.cls.cpu().numpy().astype(np.int32)
-            
+            detector_time = results[0].speed['preprocess'] + results[0].speed['inference'] + results[0].speed['postprocess']
+
             bboxes = np.hstack((clses[:, None], bboxes, confs[:, None]))
 
             for bbox in bboxes:
@@ -74,14 +76,16 @@ if __name__ == '__main__':
         else:
             tracker_bboxes = []
             detector_bboxes = []
-        
+
+            detector_time = 13.0
             if cluster_dic:
                 merged_img = get_merge_img(img, packed_img, packed_rect)
                 results = model.predict(merged_img, save_txt=False, save=False, classes=[0], imgsz=(merged_img.shape[0], merged_img.shape[1]), conf=0.3)
                 detector_bboxes = results[0].boxes.xyxy.cpu().numpy().astype(np.int32)
                 detector_confs = results[0].boxes.conf.cpu().numpy().astype(np.float32)
                 detector_clses = results[0].boxes.cls.cpu().numpy().astype(np.int32)
-            
+                detector_time = results[0].speed['preprocess'] + results[0].speed['inference'] + results[0].speed['postprocess']
+
                 detector_bboxes = np.hstack((detector_clses[:, None], detector_bboxes, detector_confs[:, None]))
                 detector_bboxes = revert_bboxes(detector_bboxes, packed_rect)
                 detector_bboxes = tlbr2tlwh(detector_bboxes)
@@ -121,4 +125,7 @@ if __name__ == '__main__':
         
         # cv2.imwrite(osp.join(save_path, img_filename.replace('png', 'jpg')), img_copy)
         
+        detector_time_list.append(detector_time)
         np.savetxt(osp.join(save_path, img_filename.replace('jpg', 'txt')), tlwh2xywhn(bboxes, H, W), fmt='%.6f')
+    print(detector_time_list)
+    print(np.array(detector_time_list).mean())

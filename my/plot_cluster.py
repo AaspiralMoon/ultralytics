@@ -41,7 +41,7 @@ def plot_bbox(img, bboxes, color=(0, 255, 0), thickness=2):
 if __name__ == '__main__':
     img_root = '/home/wiser-renjie/remote_datasets/wildtrack/decoded_images/cam7'
     save_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    cam_id = 'cam7_merge_withbbox'
+    cam_id = 'wildtrack_cam7_cluster_1152_1920_200_2_0.1_TOP3000'
     save_path = mkdir_if_missing(osp.join(save_root, cam_id))
     
     model = YOLO('yolov8x.pt')
@@ -51,13 +51,15 @@ if __name__ == '__main__':
     block_size = 128
     
     for i, img_filename in enumerate(sorted(os.listdir(img_root))):
-        
+        print('\n ----------------- Frame : {} ------------------- \n'.format(img_filename))
+        if i == 3000:
+            break
         img_path = osp.join(img_root, img_filename)
         img0 = cv2.imread(img_path)
         
         img = cv2.resize(img0, (W, H))
            
-        results = model.predict(img, save_txt=False, save=False, classes=[0], imgsz=(H, W), conf=0.5)
+        results = model.predict(img, save_txt=False, save=False, classes=[0], imgsz=(H, W), conf=0.3)
 
         bboxes = results[0].boxes.xyxy.cpu().numpy()
         
@@ -66,7 +68,7 @@ if __name__ == '__main__':
         t2 = time.time()
         print(f'cluster time: {(t2-t1)*1000} ms')
         
-        # img = plot_grid(img, block_size=128)
+        img = plot_grid(img, block_size=128)
         img = plot_bbox(img, bboxes)
         
         if cluster_dic:
@@ -78,7 +80,7 @@ if __name__ == '__main__':
             merged_img = get_merge_img(img, packed_img, packed_rect)
             
             img = plot_cluster(img, hard_blocks)
-            cv2.imwrite(osp.join(save_path, img_filename.replace('png', 'jpg')), merged_img)
+            # cv2.imwrite(osp.join(save_path, img_filename.replace('png', 'jpg')), merged_img)
             
-        # cv2.imwrite(osp.join(save_path, img_filename.replace('png', 'jpg')), img)
+        cv2.imwrite(osp.join(save_path, img_filename.replace('png', 'jpg')), img)
         

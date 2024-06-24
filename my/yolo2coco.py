@@ -93,8 +93,8 @@ yolo_to_coco(
 
 # 生成包含检测结果的 JSON
 yolo_to_coco(
-    '/home/wiser-renjie/projects/yolov8/my/runs/my/wildtrack_cam7_my_1152_1920_0.3_i10_TOP3000', 
-    '/home/wiser-renjie/projects/yolov8/my/runs/my/jsons/wildtrack_cam7_my_1152_1920_0.3_i10_TOP3000.json',
+    '/home/wiser-renjie/projects/yolov8/my/runs/my/wildtrack_cam7_my_yolol_1152_1920_0.3_i10_TOP3000', 
+    '/home/wiser-renjie/projects/yolov8/my/runs/my/jsons/wildtrack_cam7_my_yolol_1152_1920_0.3_i10_TOP3000.json',
     img_size=(1152, 1920),
     is_gt=False
 )

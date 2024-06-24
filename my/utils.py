@@ -83,6 +83,7 @@ def mkdir_if_missing(d):
     return d
 
 def tlwh2tlbr(x):
+    x = np.asarray(x)
     y = np.empty_like(x)
     
     if y.size == 0:
@@ -174,7 +175,7 @@ def compute_union(bboxes, img_size):      # img_size = (H, W)
     
 #     return [x1, y1, x2, y2]
 
-def bbox_to_blocks(union_region, block_size):
+def bbox_to_blocks(union_region, block_size=128):
     x1, y1, x2, y2 = union_region
 
     # Calculate block indices
@@ -260,8 +261,8 @@ def plot_grid(img, block_size=128):
     return img
 
 def plot_bbox(img, bboxes, color=(0, 255, 0), thickness=2):
-    
-    for bbox in bboxes.astype(np.int32):
+    bboxes = np.asarray(bboxes, dtype=np.int32)
+    for bbox in bboxes:
         x1, y1, x2, y2 = bbox
         cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness)
         

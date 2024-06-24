@@ -13,11 +13,11 @@ if __name__ == '__main__':
     save_path = osp.join(result_root, 'predict'+get_idx(result_root))
     img_path = '/home/wiser-renjie/remote_datasets/cityscapes/leftImg8bit_sequence/train/jena/jena_000066_000002_leftImg8bit.png'
     
-    batch_size = 50
+    batch_size = 2
     
     imgs = []
 
-    img = load_image(img_path, (128, 128))
+    img = load_image(img_path, (512, 256))
     
     for i in range(batch_size):
         imgs.append(img)
@@ -26,18 +26,21 @@ if __name__ == '__main__':
     
     # ----------- wamrup ------------
     for i in range (10):
-        _ = Yolox.predict(imgs, save=False, imgsz=(img.shape[0], img.shape[1]), conf=0.5)
+        _ = Yolox.predict(img, save=False, imgsz=(img.shape[0], img.shape[1]), conf=0.5)
     
     # ----------- eval ------------
     # batch
     t1 = time.time()
     _ = Yolox.predict(imgs, save=False, imgsz=(img.shape[0], img.shape[1]), conf=0.5)
     t2 = time.time()
-    print('Batch processing {} images, total: {} ms, average: {} ms'.format(batch_size, (t2-t1)*1000, (t2-t1)*1000/batch_size))
+    
     
     # loop
-    t1 = time.time()
+    t3 = time.time()
     for i in range(batch_size):
         _ = Yolox.predict(img, save=False, imgsz=(img.shape[0], img.shape[1]), conf=0.5)
-    t2 = time.time()
-    print('loop processing {} images, total: {} ms, average: {} ms'.format(batch_size, (t2-t1)*1000, (t2-t1)*1000/batch_size))
+    t4 = time.time()
+    
+    
+    print('Batch processing {} images, total: {} ms, average: {} ms'.format(batch_size, (t2-t1)*1000, (t2-t1)*1000/batch_size))
+    print('Loop processing {} images, total: {} ms, average: {} ms'.format(batch_size, (t4-t3)*1000, (t4-t3)*1000/batch_size))
