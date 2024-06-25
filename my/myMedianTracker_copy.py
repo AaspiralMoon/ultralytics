@@ -26,7 +26,7 @@ if __name__ == '__main__':
             break
         img0 = cv2.imread(osp.join(img_root, filename))
         img = cv2.resize(img0, (W, H))
-        img0_copy = img0.copy()
+        img_copy = img.copy()
         
         if i % interval == 0:
             trackers.clear()
@@ -64,8 +64,8 @@ if __name__ == '__main__':
         # Draw bounding boxes
         for bbox in bboxes.astype(np.int32):
             _, x1, y1, w, h, _ = bbox 
-            cv2.rectangle(img0_copy, (x1, y1), (x1 + w, y1 + h), color, 2)
+            cv2.rectangle(img_copy, (x1, y1), (x1 + w, y1 + h), color, 2)
         
-        cv2.imwrite(osp.join(result_path, filename), img0_copy)
+        cv2.imwrite(osp.join(result_path, filename), img_copy)
         
         np.savetxt(osp.join(result_path, filename.replace('jpg', 'txt').replace('png', 'txt')), tlwh2xywhn(bboxes, H, W), fmt='%.6f')

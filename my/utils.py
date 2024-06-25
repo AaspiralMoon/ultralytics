@@ -267,3 +267,15 @@ def plot_bbox(img, bboxes, color=(0, 255, 0), thickness=2):
         cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness)
         
     return img
+
+def scale_bbox(bboxes, Hc, Wc, Ht, Wt):             # Hc: current heright, Ht: target height
+    bboxes = np.asarray(bboxes, dtype=np.float32)
+    if bboxes.size != 0:
+        scale_x = Wt / Wc
+        scale_y = Ht / Hc
+        
+        scales = np.array([scale_x, scale_y, scale_x, scale_y])
+        
+        bboxes = bboxes * scales
+
+    return bboxes
