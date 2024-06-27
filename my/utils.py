@@ -265,7 +265,17 @@ def plot_bbox(img, bboxes, color=(0, 255, 0), thickness=2):
     for bbox in bboxes:
         x1, y1, x2, y2 = bbox
         cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness)
+    return img
+
+def plot_bbox_with_labels(img, bboxes, labels, thresh=0.5, color=(0, 255, 0), thickness=2):
+    bboxes = np.asarray(bboxes, dtype=np.int32)
+    for bbox, label in zip(bboxes, labels):
+        x1, y1, x2, y2 = bbox       
+        label_color = (0, 255, 255) if label < thresh else color
+        cv2.rectangle(img, (x1, y1), (x2, y2), label_color, thickness)
         
+        label = f'{int(label*100)}%'
+        cv2.putText(img, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, label_color, thickness=2)
     return img
 
 def scale_bbox(bboxes, Hc, Wc, Ht, Wt):             # Hc: current heright, Ht: target height
@@ -279,3 +289,77 @@ def scale_bbox(bboxes, Hc, Wc, Ht, Wt):             # Hc: current heright, Ht: t
         bboxes = bboxes * scales
 
     return bboxes
+
+
+def get_iou(bbox1, bbox2):
+    """
+    Calculate the Intersection over Union (IoU) of two bounding boxes.
+
+    Parameters
+    ----------
+    bb1 : tuple('x1', 'x2', 'y1', 'y2')
+        The (x1, y1) position is at the top left corner,
+        the (x2, y2) position is at the bottom right corner
+    bb2 : tuple('x1', 'x2', 'y1', 'y2')
+        The (x, y) position is at the top left corner,
+        the (x2, y2) position is at the bottom right corner
+
+    Returns
+    -------
+    float
+        in [0, 1]
+    """
+    ax1, ay1, ax2, ay2 = bbox1
+    bx1, by1, bx2, by2 = bbox2
+    assert ax1 < ax2, (bbox1, bbox2)
+    assert ay1 < ay2, (bbox1, bbox2)
+    assert bx1 < bx2, (bbox1, bbox2)
+    assert by1 < by2, (bbox1, bbox2)
+
+    # determine the coordinates of the intersection rectangle
+    x_left = max(ax1, bx1)
+    y_top = max(ay1, by1)
+    x_right = min(ax2, bx2)
+    y_bottom = min(ay2, by2)
+
+    if x_right < x_left or y_bottom < y_top:
+        return 0.0
+
+    # The intersection of two axis-aligned bounding boxes is always an
+    # axis-aligned bounding box
+    intersection_area = (x_right - x_left) * (y_bottom - y_top)
+
+    # compute the area of both AABBs
+    bb1_area = (ax2 - ax1) * (ay2 - ay1)
+    bb2_area = (bx2 - bx1) * (by2 - by1)
+
+    # compute the intersection over union by taking the intersection
+    # area and dividing it by the sum of prediction + ground-truth
+    # areas - the interesection area
+    iou = intersection_area / float(bb1_area + bb2_area - intersection_area)
+    assert iou >= 0.0
+    assert iou <= 1.0
+    return iou
+
+def find_FPs(bboxes, gts, thresh=0.5):
+    FPs = []
+    for bbox in bboxes:
+        best_iou = 0
+        for gt in gts:
+            iou = get_iou(bbox, gt)
+            if iou > best_iou:
+                best_iou = iou
+        if best_iou < thresh:
+            FPs.append(bbox)
+    return FPs
+
+def get_best_iou(bboxes, gts):
+    ious = []
+    for bbox in bboxes:
+        best_iou = 0
+        for gt in gts:
+            iou = get_iou(bbox, gt)
+            if iou > best_iou:
+                best_iou = iou
+        ious.append(best_iou)
+    return ious

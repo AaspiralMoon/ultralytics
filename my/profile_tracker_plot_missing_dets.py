@@ -5,7 +5,7 @@ import time
 import numpy as np
 from ultralytics import YOLO
 from test_cluster import dbscan_clustering
-from myMedianTracker import mkdir_if_missing, transform_bbox
+from myMedianTracker import mkdir_if_missing
 from utils import STrack, tlwh2tlbr, tlbr2tlwh, tlwh2xywhn, bbox_to_blocks, plot_cluster, plot_grid, plot_bbox
 from test_merge import get_merge_info, get_merge_img
 
@@ -32,12 +32,12 @@ from test_merge import get_merge_info, get_merge_img
 #     return sum(1 for elem in list_A if elem in list_B) / len(list_A)
 
 if __name__ == '__main__':
-    img_root = '/home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/datasets_separated/MOT17-09-SDP/images'
+    img_root = '/home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/datasets_separated/MOT17-04-SDP/images'
     save_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    exp_id = 'profile_tracker_MOT17-09-SDP_i10'
+    exp_id = 'profile_tracker_MOT17-04-SDP_30'
     save_path = mkdir_if_missing(osp.join(save_root, exp_id))
     
-    interval = 10
+    interval = 30
     
     model = YOLO('/home/wiser-renjie/projects/yolov8/my/weights/yolov8x_MOT17.pt')
     tracker = cv2.legacy.MultiTracker_create()

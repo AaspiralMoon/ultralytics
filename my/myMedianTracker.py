@@ -7,12 +7,12 @@ from ultralytics import YOLO as yolo
 from utils import mkdir_if_missing, tlbr2tlwh, tlwh2xywhn, scale_bbox
 
 if __name__ == '__main__':
-    img_root = '/home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/datasets_separated_splitted/MOT17-04-SDP/test/images'
+    img_root = '/home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/datasets_separated_splitted/MOT17-09-SDP/test/images'
     result_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    exp_id = 'MOT17-04-SDP_medianflow_yolox_1152_1920_0.3_144_240_i5'
+    exp_id = 'MOT17-09-SDP_medianflow_yolox_1152_1920_0.3_144_240_i10'
     result_path = mkdir_if_missing(osp.join(result_root, exp_id))
     
-    interval = 5
+    interval = 10
     
     model = yolo('/home/wiser-renjie/projects/yolov8/my/weights/yolov8x_MOT17.pt')
     tracker = cv2.legacy.MultiTracker_create()
@@ -35,7 +35,6 @@ if __name__ == '__main__':
         if i % interval == 0:
             trackers.clear()
             results = model.predict(img, save=False, imgsz=(H, W), classes=[0], conf=0.3)
-            # results = model.predict(img, save=False, imgsz=(H, W), conf=0.5)
             bboxes = results[0].boxes.xyxy.cpu().numpy().astype(np.int32)
             confs = results[0].boxes.conf.cpu().numpy().astype(np.float32)
             clses = results[0].boxes.cls.cpu().numpy().astype(np.int32)

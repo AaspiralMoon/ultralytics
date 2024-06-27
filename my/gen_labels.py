@@ -10,12 +10,12 @@ def mkdir_if_missing(d):
     return d
 
 if __name__ == '__main__':
-    img_root = '/home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/datasets_separated_splitted/MOT17-04-SDP/test/images'
+    img_root = '/home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/datasets_separated_splitted/MOT17-09-SDP/test/images'
     save_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    exp_id = 'MOT17-04-SDP_yolov8x_1152_1920_0.3'
+    exp_id = 'MOT17-09-SDP_yolov8m_1152_1920_0.3'
     save_path = mkdir_if_missing(osp.join(save_root, exp_id))
     
-    model = YOLO('/home/wiser-renjie/projects/yolov8/my/weights/yolov8x_MOT17.pt')
+    model = YOLO('/home/wiser-renjie/projects/yolov8/my/weights/yolov8m_MOT17.pt')
     
     H = 1152
     W = 1920

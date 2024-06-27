@@ -5,28 +5,28 @@ import time
 import numpy as np
 from ultralytics import YOLO
 from test_cluster import dbscan_clustering
-from myMedianTracker import mkdir_if_missing, transform_bbox
+from myMedianTracker import mkdir_if_missing, scale_bbox
 from utils import STrack, tlwh2tlbr, tlbr2tlwh, tlwh2xywhn, detection_rate_adjuster, compute_union, bbox_to_blocks, merge_bboxes, revert_bboxes, check_boundary, plot_cluster, plot_grid
 from test_merge import get_merge_info, get_merge_img
 
 
 if __name__ == '__main__':
-    img_root = '/home/wiser-renjie/remote_datasets/wildtrack/decoded_images/cam7'
+    img_root = '/home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/datasets_separated_splitted/MOT17-04-SDP/test/images'
     save_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    cam_id = 'wildtrack_cam7_my_yolol_1152_1920_0.3_i10_TOP3000'
-    save_path = mkdir_if_missing(osp.join(save_root, cam_id))
+    exp_id = 'MOT17-04-SDP_my_yolox_1152_1920_0.3_1152_1920_i10'
+    save_path = mkdir_if_missing(osp.join(save_root, exp_id))
     
     interval = 10
     
-    model = YOLO('/home/wiser-renjie/projects/yolov8/my/weights/yolov8l_MOT17.pt')
+    model = YOLO('/home/wiser-renjie/projects/yolov8/my/weights/yolov8x_MOT17.pt')
     tracker = cv2.legacy.MultiTracker_create()
     trackers = []
     
     detector_time_list = []
     for i, img_filename in enumerate(sorted(os.listdir(img_root))):
         print('\n ----------------- Frame : {} ------------------- \n'.format(img_filename))
-        if i == 3000:
-            break
+        # if i == 3000:
+        #     break
         
         img_path = osp.join(img_root, img_filename)
         
