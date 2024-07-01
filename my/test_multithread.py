@@ -8,9 +8,15 @@ from ultralytics import YOLO as yolo
 from utils import mkdir_if_missing, tlbr2tlwh
 
 def run_detector(img, model, H, W, queue):
+    start = time.time()
     results = model.predict(img, save=False, imgsz=(H, W), classes=[0], conf=0.3)
     bboxes = results[0].boxes.xyxy.cpu().numpy().astype(np.int32)
-    queue.put(bboxes)
+    confs = results[0].boxes.conf.cpu().numpy().astype(np.float32)
+    clses = results[0].boxes.cls.cpu().numpy().astype(np.int32)
+    out = np.hstack((clses[:, None], bboxes, confs[:, None]))
+    end = time.time()
+    detection_time = (end - start)*1000
+    queue.put((out, detection_time))
 
 if __name__ == '__main__':
     img_path1 = '/home/wiser-renjie/remote_datasets/wildtrack/decoded_images/cam7/00000446.jpg'

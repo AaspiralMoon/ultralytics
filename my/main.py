@@ -2,37 +2,42 @@ import os
 import os.path as osp
 import cv2
 import time
+import threading
+import queue
 import numpy as np
 from ultralytics import YOLO
 from test_cluster import dbscan_clustering
 from myMedianTracker import mkdir_if_missing, scale_bbox
-from utils import STrack, tlwh2tlbr, tlbr2tlwh, tlwh2xywhn, detection_rate_adjuster, compute_union, bbox_to_blocks, merge_bboxes, revert_bboxes, check_boundary, plot_cluster, plot_grid
+from utils import STrack, tlwh2tlbr, tlbr2tlwh, tlwh2xywhn, detection_rate_adjuster, compute_union, bbox_to_blocks, merge_bboxes, revert_bboxes, check_boundary, plot_cluster, plot_grid, plot_bbox, run_detector
 from test_merge import get_merge_info, get_merge_img
 
 
 if __name__ == '__main__':
     img_root = '/home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/datasets_separated_splitted/MOT17-04-SDP/test/images'
     save_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    exp_id = 'MOT17-04-SDP_my_yolox_1152_1920_0.3_1152_1920_i10'
+    exp_id = 'test'
     save_path = mkdir_if_missing(osp.join(save_root, exp_id))
     
     interval = 10
+    light_tracker_frame = 3
     
     model = YOLO('/home/wiser-renjie/projects/yolov8/my/weights/yolov8x_MOT17.pt')
     tracker = cv2.legacy.MultiTracker_create()
     trackers = []
     
-    detector_time_list = []
+    H, W = 1152, 1920
+    Ht, Wt = 144, 240  # resolution for tracking
+    
+    e2e_time_list = []
+    
     for i, img_filename in enumerate(sorted(os.listdir(img_root))):
         print('\n ----------------- Frame : {} ------------------- \n'.format(img_filename))
-        # if i == 3000:
-        #     break
+        if i == 3000:
+            break
         
         img_path = osp.join(img_root, img_filename)
         
         img0 = cv2.imread(img_path)
-        
-        H, W = 1152, 1920
         img = cv2.resize(img0, (W, H))
         img_copy = img.copy()
         
@@ -46,10 +51,9 @@ if __name__ == '__main__':
 
             bboxes = np.hstack((clses[:, None], bboxes, confs[:, None]))
 
-            for bbox in bboxes:
-                _, x1, y1, x2, y2, _ = bbox.astype(np.int32) 
-                cv2.rectangle(img_copy, (x1, y1), (x2, y2), (0, 0, 255), 2)
-                
+            img_copy = plot_bbox(img_copy, bboxes[:, 1:5], color=(0, 0, 255))
+            
+            cluster_start = time.time()
             cluster_bboxes, cluster_dic, cluster_num = dbscan_clustering(bboxes[:, 1:5])
             # interval = detection_rate_adjuster(cluster_num)
             # print(f'Updated interval to {interval}')
@@ -63,69 +67,93 @@ if __name__ == '__main__':
                 bboxes = check_boundary(bboxes, hard_blocks)
                 
             bboxes = tlbr2tlwh(bboxes)
-                    
-            t1 = time.time()
-            for bbox in bboxes:
+            stracks = np.array([STrack(tlwh) for tlwh in bboxes[..., 1:5]], dtype=object)
+            cluster_end = time.time()
+            cluster_time = (cluster_end - cluster_start)*1000
+            
+            tracker_init_start = time.time()
+            for bbox in scale_bbox(bboxes, H, W, Ht, Wt):
                 _, x1, y1, w, h, _ = bbox
                 tracker = cv2.legacy.TrackerMedianFlow_create()
-                tracker.init(img, (x1, y1, w, h))
+                tracker.init(img_track, (x1, y1, w, h))
                 trackers.append(tracker)
-            t2 = time.time()
-            # print('Init time: {} ms\n'.format((t2-t1)*1000))
+            tracker_init_end = time.time()
+            tracker_init_time = (tracker_init_end - tracker_init_start)*1000
+            
+            e2e_time = detector_time + cluster_time + tracker_init_time
 
         else:
             tracker_bboxes = []
             detector_bboxes = []
-
-            detector_time = 13.0
+            
+            q = queue.Queue()
+            
+            detector_tracker_start = time.time()
             if cluster_dic:
                 merged_img = get_merge_img(img, packed_img, packed_rect)
-                results = model.predict(merged_img, save_txt=False, save=False, classes=[0], imgsz=(merged_img.shape[0], merged_img.shape[1]), conf=0.3)
-                detector_bboxes = results[0].boxes.xyxy.cpu().numpy().astype(np.int32)
-                detector_confs = results[0].boxes.conf.cpu().numpy().astype(np.float32)
-                detector_clses = results[0].boxes.cls.cpu().numpy().astype(np.int32)
-                detector_time = results[0].speed['preprocess'] + results[0].speed['inference'] + results[0].speed['postprocess']
-
-                detector_bboxes = np.hstack((detector_clses[:, None], detector_bboxes, detector_confs[:, None]))
+                detector_thread = threading.Thread(target=run_detector, args=(merged_img, model, merged_img.shape[0], merged_img.shape[1], q))
+                detector_thread.start()
+            
+            # use light tracker to tracker N frames and init 
+            if i % interval <= light_tracker_frame:
+                resize_start = time.time()
+                img_track = cv2.resize(img0, (Wt, Ht))         # small img for tracking
+                resize_end = time.time()
+                resize_time = (resize_end - resize_start)*1000
+            
+                tracker_start = time.time()
+                for j, tracker in enumerate(trackers):
+                    ok, out = tracker.update(img_track)
+                    x1, y1, w, h = out
+                    cls = clses[j]
+                    conf = confs[j]
+                    tracker_bboxes.append([cls, x1, y1, w, h, conf])
+                tracker_bboxes = scale_bbox(tracker_bboxes, Ht, Wt, H, W)
+                tracker_end = time.time()
+                tracker_time = (tracker_end - tracker_start)*1000
+                
+            else:
+                kalman_start = time.time()
+                for strack in stracks:
+                    strack.predict()
+                    bbox = strack.bbox
+                    tracker_bboxes.append(bbox)
+                tracker_bboxes = np.array(tracker_bboxes)
+                tracker_bboxes = np.hstack((clses[:, None], tracker_bboxes, confs[:, None]))
+                kalman_end = time.time()
+                kalman_time = (kalman_end - kalman_start)*1000
+                 
+            detector_thread.join()
+            detector_bboxes, detector_time = q.get()
+            
+            # detector bboxes post processing
+            if cluster_dic:
                 detector_bboxes = revert_bboxes(detector_bboxes, packed_rect)
                 detector_bboxes = tlbr2tlwh(detector_bboxes)
-                
-            for j, tracker in enumerate(trackers):
-                ok, out = tracker.update(img)
-                x1, y1, w, h = out
-                cls = clses[j]
-                conf = confs[j]
-                tracker_bboxes.append([cls, x1, y1, w, h, conf])
-
-            tracker_bboxes = np.array(tracker_bboxes)
             
             bboxes = merge_bboxes(detector_bboxes, tracker_bboxes)
 
-            # cluster_bboxes, cluster_dic, cluster_num = dbscan_clustering(bboxes)
-        
-            # if cluster_dic:
-            #     hard_regions = [compute_union(cluster_bboxes[x], (H, W)) for x in cluster_bboxes]
-            #     hard_blocks = np.array([bbox_to_blocks(y, 128) for y in hard_regions], dtype=np.int32)             
-            #     packed_img, packed_rect = get_merge_info(hard_blocks)
-                
+            detector_tracker_end = time.time()
+            detector_tracker_time = (detector_tracker_end - detector_tracker_start)*1000
+            
+            e2e_time = detector_tracker_time
+            
             for tracker_bbox in tracker_bboxes:
                 _, x1, y1, w, h, _ = tracker_bbox.astype(np.int32) 
                 cv2.rectangle(img_copy, (x1, y1), (x1 + w, y1 + h), (0, 255, 0), 2)
             
-            for detector_bbox in detector_bboxes:
-                _, x1, y1, w, h, _ = detector_bbox.astype(np.int32) 
-                cv2.rectangle(img_copy, (x1, y1), (x1 + w, y1 + h), (255, 0, 0), 2)
-        
+            tracker_bbox_color = (255, 0, 0) if i % interval <= light_tracker_frame else (0, 255, 0)
+            img_copy = plot_bbox(img_copy, tracker_bboxes[..., 1:5], color=tracker_bbox_color)
+            img_copy = plot_bbox(img_copy, detector_bboxes[..., 1:5], color=(0, 0, 255))
+
         if cluster_dic:
             img_copy = plot_cluster(img_copy, hard_blocks)
             
         img_copy = plot_grid(img_copy, block_size=128)
-        # bboxes = tlwh2xywhn(bboxes, H0, W0)
-        # bboxes = np.insert(bboxes, 0, 0, axis=1)
         
-        # cv2.imwrite(osp.join(save_path, img_filename.replace('png', 'jpg')), img_copy)
+        cv2.imwrite(osp.join(save_path, img_filename.replace('png', 'jpg')), img_copy)
         
-        detector_time_list.append(detector_time)
+        e2e_time_list.append(e2e_time)
         np.savetxt(osp.join(save_path, img_filename.replace('jpg', 'txt')), tlwh2xywhn(bboxes, H, W), fmt='%.6f')
-    print(detector_time_list)
-    print(np.array(detector_time_list).mean())
+    print(e2e_time_list)
+    print(np.array(e2e_time_list).mean())

@@ -78,12 +78,16 @@ if __name__ == '__main__':
         
         else:
             bboxes = []
+            t5 = time.time()
             for strack in stracks:
                 strack.predict()
                 bbox = strack.bbox
                 bboxes.append(bbox)
             bboxes = np.array(bboxes)
             bboxes = np.hstack((clses[:, None], bboxes, confs[:, None]))
+            t6 = time.time()
+            kalman_time = (t6-t5)*1000
+            print('Kalman time: {} ms\n'.format(kalman_time))
         
         if i % interval == 0: 
             color = (0, 0, 255)                # red for detector
@@ -96,7 +100,7 @@ if __name__ == '__main__':
             _, x1, y1, w, h, _ = bbox 
             cv2.rectangle(img_copy, (x1, y1), (x1 + w, y1 + h), color, 2)
         
-        cv2.imwrite(osp.join(result_path, filename), img_copy)
+        # cv2.imwrite(osp.join(result_path, filename), img_copy)
         
         # np.savetxt(osp.join(result_path, filename.replace('jpg', 'txt').replace('png', 'txt')), tlwh2xywhn(bboxes, H, W), fmt='%.6f')
         

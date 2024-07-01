@@ -286,10 +286,12 @@ def scale_bbox(bboxes, Hc, Wc, Ht, Wt):             # Hc: current heright, Ht: t
         
         scales = np.array([scale_x, scale_y, scale_x, scale_y])
         
-        bboxes = bboxes * scales
+        if bboxes.shape[1] == 4:
+            bboxes = bboxes * scales
+        elif bboxes.shape[1] == 6:
+            bboxes[:, 1:5] = bboxes[:, 1:5] * scales
 
     return bboxes
-
 
 def get_iou(bbox1, bbox2):
     """
@@ -363,3 +365,11 @@ def get_best_iou(bboxes, gts):
                 best_iou = iou
         ious.append(best_iou)
     return ious
+
+def run_detector(img, model, H, W, queue):
+    results = model.predict(img, save=False, imgsz=(H, W), classes=[0], conf=0.3)
+    bboxes = results[0].boxes.xyxy.cpu().numpy().astype(np.int32)
+    confs = results[0].boxes.conf.cpu().numpy().astype(np.float32)
+    clses = results[0].boxes.cls.cpu().numpy().astype(np.int32)
+    out = np.hstack((clses[:, None], bboxes, confs[:, None]))
+    queue.put(out)
