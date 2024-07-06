@@ -14,7 +14,7 @@ model = YOLO('yolov8x.pt')
 img = cv2.imread('/home/wiser-renjie/remote_datasets/wildtrack/decoded_images/cam7/00000001.jpg')
 img = cv2.resize(img, (640, 640))
 
-results = model.predict(img, save_txt=False, save_conf=False, save=False, classes=[0], imgsz=(1152, 1920), conf=0.3)
+results = model.predict('/home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/datasets_separated_splitted/MOT17-04-SDP/test/images/001037.jpg', save_txt=False, save_conf=False, save=True, classes=[0], imgsz=(1152, 1920), conf=0.3)
 time = results[0].speed['preprocess'] + results[0].speed['inference'] + results[0].speed['postprocess']
 print(time)
 # print(results[0].tojson())

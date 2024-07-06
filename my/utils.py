@@ -1,5 +1,6 @@
 import os
 import cv2
+import time
 import numpy as np
 import os.path as osp
 from kalman_filter import KalmanFilter
@@ -294,23 +295,14 @@ def scale_bbox(bboxes, Hc, Wc, Ht, Wt):             # Hc: current heright, Ht: t
     return bboxes
 
 def get_iou(bbox1, bbox2):
-    """
-    Calculate the Intersection over Union (IoU) of two bounding boxes.
-
-    Parameters
-    ----------
-    bb1 : tuple('x1', 'x2', 'y1', 'y2')
-        The (x1, y1) position is at the top left corner,
-        the (x2, y2) position is at the bottom right corner
-    bb2 : tuple('x1', 'x2', 'y1', 'y2')
-        The (x, y) position is at the top left corner,
-        the (x2, y2) position is at the bottom right corner
-
-    Returns
-    -------
-    float
-        in [0, 1]
-    """
+    bbox1 = np.asarray(bbox1)
+    bbox2 = np.asarray(bbox2)
+    assert bbox1.shape == bbox2.shape
+    
+    if bbox1.shape[0] == 6:
+        bbox1 = bbox1[1:5]
+        bbox2 = bbox2[1:5]
+    
     ax1, ay1, ax2, ay2 = bbox1
     bx1, by1, bx2, by2 = bbox2
     assert ax1 < ax2, (bbox1, bbox2)
@@ -367,9 +359,84 @@ def get_best_iou(bboxes, gts):
     return ious
 
 def run_detector(img, model, H, W, queue):
-    results = model.predict(img, save=False, imgsz=(H, W), classes=[0], conf=0.3)
+    start = time.time()
+    results = model.predict(img, save=True, imgsz=(H, W), classes=[0], conf=0.3)
     bboxes = results[0].boxes.xyxy.cpu().numpy().astype(np.int32)
     confs = results[0].boxes.conf.cpu().numpy().astype(np.float32)
     clses = results[0].boxes.cls.cpu().numpy().astype(np.int32)
     out = np.hstack((clses[:, None], bboxes, confs[:, None]))
-    queue.put(out)
+    end = time.time()
+    detection_time = (end - start)*1000
+    queue.put((out, detection_time))
+    
+def filter_bbox(bboxes, conf_thresh=0.5):
+    bboxes = np.asarray(bboxes)
+    if bboxes.size == 0:
+        return bboxes
+    filtered_bboxes = bboxes[bboxes[:, 4] > conf_thresh]
+    return filtered_bboxes
+
+def compute_center_distance(bboxes1, bboxes2):
+    bboxes1 = np.asarray(bboxes1)
+    bboxes2 = np.asarray(bboxes2)
+    centers1 = (bboxes1[..., [0, 1]] + bboxes1[..., [2, 3]]) / 2
+    centers2 = (bboxes2[..., [0, 1]] + bboxes2[..., [2, 3]]) / 2
+    distances = np.sqrt(((centers1[:, np.newaxis, :] - centers2[np.newaxis, :, :]) ** 2).sum(axis=2))
+    return distances
+
+def handle_boundary_conflicts(prev_hard_bboxes, curr_hard_bboxes, dist_thresh=20, iou_thresh=0.8, type='dist'):
+    prev_hard_bboxes = np.asarray(prev_hard_bboxes)
+    curr_hard_bboxes = np.asarray(curr_hard_bboxes)
+    
+    valid_bboxes = []
+
+    if type in ['both', 'dist']:
+        distances = compute_center_distance(prev_hard_bboxes, curr_hard_bboxes)
+
+    if type in ['both', 'iou']:
+        ious = np.array([[get_iou(prev_bbox, curr_bbox) for curr_bbox in curr_hard_bboxes] for prev_bbox in prev_hard_bboxes])
+
+    for i, prev_bbox in enumerate(prev_hard_bboxes):
+        for j, curr_bbox in enumerate(curr_hard_bboxes):
+            if type == 'dist' and distances[i, j] <= dist_thresh:
+                valid_bboxes.append(curr_bbox)
+            elif type == 'iou' and ious[i, j] >= iou_thresh:
+                valid_bboxes.append(curr_bbox)
+            elif type == 'both' and distances[i, j] <= dist_thresh and ious[i, j] >= iou_thresh:
+                valid_bboxes.append(curr_bbox)
+    
+    return np.array(valid_bboxes)
+
+def is_in_hard_block(bbox, hard_blocks):
+    x1, y1, x2, y2 = bbox[1:5]
+    for block in hard_blocks:
+        bx1, by1, bx2, by2 = block
+        if x1 >= bx1 and y1 >= by1 and x2 <= bx2 and y2 <= by2:
+            return True
+    return False
+
+def clip_bbox(bboxes, H, W):
+    bboxes = np.asarray(bboxes)
+    bboxes[:, 1] = np.clip(bboxes[:, 1], 0, W)
+    bboxes[:, 2] = np.clip(bboxes[:, 2], 0, H)
+    bboxes[:, 3] = np.clip(bboxes[:, 3], 0, W)
+    bboxes[:, 4] = np.clip(bboxes[:, 4], 0, H)
+    return bboxes
+
+# def handle_boundary_conflicts(bboxes, hard_blocks, H, W):
+#     bboxes = np.asarray(bboxes)
+#     hard_blocks = np.asarray(hard_blocks)
+    
+#     # Clip the bounding boxes to the image boundaries
+#     bboxes[:, 1] = np.clip(bboxes[:, 1], 0, W)
+#     bboxes[:, 2] = np.clip(bboxes[:, 2], 0, H)
+#     bboxes[:, 3] = np.clip(bboxes[:, 3], 0, W)
+#     bboxes[:, 4] = np.clip(bboxes[:, 4], 0, H)
+
+#     valid_bboxes = np.array([bbox for bbox in bboxes if is_in_hard_block(bbox, hard_blocks)])
+    
+#     return valid_bboxes
+
+def find_bbox_in_hard_region(bboxes, hard_blocks):
+    return np.array([bbox for bbox in bboxes if is_in_hard_block(bbox, hard_blocks)])
+    

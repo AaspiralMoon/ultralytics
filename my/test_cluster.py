@@ -99,6 +99,9 @@ def modified_dbscan(D, eps, MinPts, IoU):
 
 
 def dbscan_clustering(bboxes):
+    bboxes0 = np.asarray(bboxes)
+    if bboxes0.shape[1] == 6:
+        bboxes = bboxes0[..., 1:5]
     
     centroid_list = []
     tid_list = []
@@ -114,18 +117,21 @@ def dbscan_clustering(bboxes):
     cluster_dic = {}
     cluster_bboxes = {}
     cluster_num = 0
+    hard_bboxes = []
     for idx, each in enumerate(cluster_label):
         if each != -1 and each not in cluster_dic.keys():
             cluster_dic[each]=[tid_list[idx]]
             cluster_bboxes[each] = [bboxes[idx]]
+            hard_bboxes.append(bboxes0[idx])
             cluster_num += 1
         else:
             if each != -1:
                 cluster_dic[each].append(tid_list[idx])
                 cluster_bboxes[each].append(bboxes[idx])
+                hard_bboxes.append(bboxes0[idx])
             else:
                 cluster_num += 1
-    return cluster_bboxes, cluster_dic, cluster_num
+    return np.array(hard_bboxes), cluster_bboxes, cluster_dic, cluster_num
 
 if __name__ == '__main__':
     # Load a pretrained YOLOv8n model

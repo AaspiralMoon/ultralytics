@@ -16,7 +16,7 @@ def load_gt(path, H, W):
     if y.size == 0:
         return y
     
-    if y.shape[1] == 5:  # [cls, xcn, ycn, wn, hn]
+    if y.shape[1] == 5 or 6:  # [cls, xcn, ycn, wn, hn], [cls, xcn, ycn, wn, hn, conf]
         cls = gt[:, 0]
         xc = gt[:, 1] * W
         yc = gt[:, 2] * H
@@ -39,21 +39,21 @@ def load_gt(path, H, W):
     return y
 
 if __name__ == '__main__':
-    img_root = '/home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/datasets_separated/MOT17-09-SDP/images'
+    img_root = '/home/wiser-renjie/remote_datasets/wildtrack/decoded_images/cam7'
     save_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    exp_id = 'profile_tracker_MOT17-09-SDP_i10_iou50_with_iou'
+    exp_id = 'profile_tracker_wildtrack_cam7_i10_iou50_with_iou'
     save_path = mkdir_if_missing(osp.join(save_root, exp_id))
-    gt_root = '/home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/datasets_separated/MOT17-09-SDP/labels'
+    gt_root = '/home/wiser-renjie/projects/yolov8/my/runs/my/gt_wildtrack_cam7_yolo8x_1152_1920_0.3_TOP3000'
     
     interval = 10
     
-    model = YOLO('/home/wiser-renjie/projects/yolov8/my/weights/yolov8x_MOT17.pt')
+    model = YOLO('/home/wiser-renjie/projects/yolov8/my/weights/yolov8x.pt')
     tracker = cv2.legacy.MultiTracker_create()
     trackers = []
     
     for i, img_filename in enumerate(sorted(os.listdir(img_root))):
         print('\n ----------------- Frame : {} ------------------- \n'.format(img_filename))
-        if i == 3500:
+        if i == 1000:
             break
         
         img_path = osp.join(img_root, img_filename)
@@ -66,7 +66,7 @@ if __name__ == '__main__':
         
         img_copy = plot_grid(img_copy, block_size=128)
         
-        gt = load_gt(osp.join(gt_root, img_filename.replace('jpg', 'txt').replace('png', 'txt')), H, W)[..., 1:]
+        gt = load_gt(osp.join(gt_root, img_filename.replace('jpg', 'txt').replace('png', 'txt')), H, W)[..., 1:5]
         
         if i % interval == 0:
             trackers.clear()

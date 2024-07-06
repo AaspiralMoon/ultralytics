@@ -12,11 +12,11 @@ from test_crop import load_image
 if __name__ == '__main__':
     img_path = '/home/wiser-renjie/remote_datasets/cityscapes/leftImg8bit_sequence/train/jena/jena_000066_000002_leftImg8bit.png'
     
-    batch_size = 4
+    batch_size = 2
     
     imgs = []
 
-    img = load_image(img_path, (512, 256))
+    img = load_image(img_path, (128, 128))
     
     for i in range(batch_size):
         imgs.append(img)
