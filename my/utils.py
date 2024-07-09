@@ -360,7 +360,7 @@ def get_best_iou(bboxes, gts):
 
 def run_detector(img, model, H, W, queue):
     start = time.time()
-    results = model.predict(img, save=True, imgsz=(H, W), classes=[0], conf=0.3)
+    results = model.predict(img, save=False, imgsz=(H, W), classes=[0], conf=0.3)
     bboxes = results[0].boxes.xyxy.cpu().numpy().astype(np.int32)
     confs = results[0].boxes.conf.cpu().numpy().astype(np.float32)
     clses = results[0].boxes.cls.cpu().numpy().astype(np.int32)
@@ -439,4 +439,42 @@ def clip_bbox(bboxes, H, W):
 
 def find_bbox_in_hard_region(bboxes, hard_blocks):
     return np.array([bbox for bbox in bboxes if is_in_hard_block(bbox, hard_blocks)])
+
+# def error_handling(curr_bboxes, prev_bboxes, dist_thresh=20, ratio_thresh=0.2):
+#     curr_bboxes = np.asarray(curr_bboxes)
+#     prev_bboxes = np.asarray(prev_bboxes)
+    
+#     assert curr_bboxes.shape[0] == prev_bboxes.shape[0], "The number of bounding boxes must be consistent"
+    
+#     curr_centers = curr_bboxes[:, :2] + curr_bboxes[:, 2:] / 2
+#     prev_centers = prev_bboxes[:, :2] + prev_bboxes[:, 2:] / 2
+
+#     center_shifts = np.linalg.norm(curr_centers - prev_centers, axis=1)
+    
+#     curr_ratios = curr_bboxes[:, 2] / curr_bboxes[:, 3]
+#     prev_ratios = prev_bboxes[:, 2] / prev_bboxes[:, 3]
+#     ratio_changes = np.abs(curr_ratios - prev_ratios) / prev_ratios
+    
+#     valid_mask = (center_shifts <= dist_thresh) & (ratio_changes <= ratio_thresh)
+#     valid_bboxes = curr_bboxes[valid_mask]
+    
+#     return valid_bboxes
+
+def error_handling(curr_bbox, prev_bbox, dist_thresh=20, ratio_thresh=0.2):
+    curr_bbox = np.asarray(curr_bbox)      # [cls, x1, y1, w, h, conf]
+    prev_bbox = np.asarray(prev_bbox)
+    
+    curr_center = curr_bbox[1:3] + curr_bbox[3:5] / 2
+    prev_center = prev_bbox[1:3] + prev_bbox[3:5] / 2
+    
+    center_shift = np.linalg.norm(curr_center - prev_center)
+    
+    curr_ratio = curr_bbox[3] / curr_bbox[4]
+    prev_ratio = prev_bbox[3] / prev_bbox[4]
+    ratio_change = abs(curr_ratio - prev_ratio) / prev_ratio
+    
+    if center_shift > dist_thresh or ratio_change > ratio_thresh:
+        return False
+    return True
+    
     

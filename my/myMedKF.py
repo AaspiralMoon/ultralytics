@@ -4,18 +4,16 @@ import time
 import numpy as np
 import os.path as osp
 from ultralytics import YOLO as yolo
-from utils import STrack
-from myMedianTracker import mkdir_if_missing, xyxy2xywh, transform_bbox
+from utils import STrack, mkdir_if_missing, tlbr2tlwh
 
 if __name__ == '__main__':
-    img_root = '/home/wiser-renjie/remote_datasets/traffic/video1_30fps'
-    # img_root = '/home/wiser-renjie/remote_datasets/MOT17/MOT17-04-SDP/img1'
+    img_root = '/home/wiser-renjie/remote_datasets/wildtrack/decoded_images/cam7'
     result_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    exp_id = 'test'
+    exp_id = 'test_medKF'
     result_path = mkdir_if_missing(osp.join(result_root, exp_id))
     
     interval = 10
-    light_track_frames = 3
+    light_track_frames = 10
     assert light_track_frames <= interval
     
     model = yolo('yolov8x.pt')
@@ -27,17 +25,16 @@ if __name__ == '__main__':
         img0 = cv2.imread(osp.join(img_root, filename))
         H0, W0 = img0.shape[:2]
         
-        img0_copy = img0.copy()
-        
-        H, W = 640, 640
-        img = cv2.resize(img0, (H, W))
+        H, W = 1152, 1920
+        img = cv2.resize(img0, (W, H))
+        img_copy = img.copy()
         
         print('\n ----------------- Frame : {} ------------------- \n'.format(i))
         if i % interval == 0:
             trackers.clear()
-            results = model.predict(img, save=False, imgsz=(H, W), classes=[2], conf=0.5)
+            results = model.predict(img, save=False, imgsz=(H, W), classes=[0], conf=0.3)
             bboxes = results[0].boxes.xyxy.cpu().numpy().astype(np.int32)
-            bboxes = xyxy2xywh(bboxes)
+            bboxes = tlbr2tlwh(bboxes)
             
             dets = np.array([STrack(tlwh) for tlwh in bboxes], dtype=object)
             
@@ -86,7 +83,6 @@ if __name__ == '__main__':
                     bboxes.append(bbox)
                 bboxes = np.array(bboxes)
 
-
         if i % interval == 0: 
             color = (0, 0, 255)                # red for detector
         elif i % interval <= light_track_frames:
@@ -94,9 +90,9 @@ if __name__ == '__main__':
         else:
             color = (0, 255, 0)                # green for kalman
         # Draw bounding boxes
-        for bbox in transform_bbox(bboxes, H0, W0, H, W).astype(np.int32):
+        for bbox in bboxes.astype(np.int32):
             x1, y1, w, h = bbox 
-            cv2.rectangle(img0_copy, (x1, y1), (x1 + w, y1 + h), color, 2)
+            cv2.rectangle(img_copy, (x1, y1), (x1 + w, y1 + h), color, 2)
             
         # for det in dets:
         #     bbox = det.bbox
@@ -104,4 +100,4 @@ if __name__ == '__main__':
         #     x1, y1, w, h = bbox 
         #     cv2.rectangle(img0_copy, (x1, y1), (x1 + w, y1 + h), (0, 255, 0), 2)
         
-        cv2.imwrite(osp.join(result_path, filename), img0_copy)
+        cv2.imwrite(osp.join(result_path, filename), img_copy)
