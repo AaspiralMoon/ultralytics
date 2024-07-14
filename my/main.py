@@ -8,14 +8,14 @@ import numpy as np
 from ultralytics import YOLO
 from test_cluster import dbscan_clustering
 from myMedianTracker import mkdir_if_missing, scale_bbox
-from utils import STrack, tlwh2tlbr, tlbr2tlwh, tlwh2xywhn, detection_rate_adjuster, compute_union, bbox_to_blocks, merge_bboxes, revert_bboxes, check_boundary, plot_cluster, plot_grid, plot_bbox, run_detector, handle_boundary_conflicts, find_bbox_in_hard_region, clip_bbox, error_handling
+from utils import STrack, tlwh2tlbr, tlbr2tlwh, tlbr2xywhn, tlwh2xywhn, detection_rate_adjuster, compute_union, compute_union2, bbox_to_blocks, merge_bboxes, revert_bboxes, check_boundary, plot_cluster, plot_grid, plot_bbox, run_detector, handle_boundary_conflicts, find_bbox_in_hard_region, clip_bbox, error_handling
 from test_merge import get_merge_info, get_merge_img
 
 
 if __name__ == '__main__':
     img_root = '/home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/datasets_separated_splitted/MOT17-04-SDP/test/images'
     save_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    exp_id = 'test_error_handling_MOT'
+    exp_id = 'MOT17-04-SDP_ours_yolox_1152_1920_0.3_576_960_i10'
     save_path = mkdir_if_missing(osp.join(save_root, exp_id))
     
     interval = 10
@@ -26,13 +26,13 @@ if __name__ == '__main__':
     trackers = []
     
     H, W = 1152, 1920
-    Ht, Wt = 144, 240  # resolution for tracking
+    Ht, Wt = 576, 960  # resolution for tracking
     
     e2e_time_list = []
     
     for i, img_filename in enumerate(sorted(os.listdir(img_root))):
         print('\n ----------------- Frame : {} ------------------- \n'.format(img_filename))
-        if i == 100:
+        if i == 3000:
             break
         # if img_filename == '001038.jpg':
         #     break
@@ -57,6 +57,7 @@ if __name__ == '__main__':
             detector_time = results[0].speed['preprocess'] + results[0].speed['inference'] + results[0].speed['postprocess']
 
             bboxes = np.hstack((clses[:, None], bboxes, confs[:, None]))
+            bboxes0 = bboxes # for saving
 
             img_copy = plot_bbox(img_copy, bboxes[:, 1:5], color=(0, 0, 255))
             
@@ -68,14 +69,15 @@ if __name__ == '__main__':
             if cluster_dic:
                 hard_regions = [compute_union(cluster_bboxes[x], (H, W)) for x in cluster_bboxes]
                 hard_blocks = np.array([bbox_to_blocks(y, 128) for y in hard_regions], dtype=np.int32)
+                hard_blocks = compute_union2(hard_blocks, (H, W))
                 hard_bboxes = find_bbox_in_hard_region(bboxes, hard_blocks)
                 packed_img, packed_rect = get_merge_info(hard_blocks)
             
                 bboxes = check_boundary(bboxes, hard_blocks)
                 
             bboxes = tlbr2tlwh(bboxes)
-            confs = bboxes[..., 0]
-            clses = bboxes[..., 5]
+            clses = bboxes[..., 0]
+            confs = bboxes[..., 5]
             cluster_end = time.time()
             cluster_time = (cluster_end - cluster_start)*1000
                         
@@ -157,25 +159,38 @@ if __name__ == '__main__':
                 print(f'Boundary time: {(t2-t1)*1000} ms')
                 detector_bboxes = tlbr2tlwh(detector_bboxes)
             
-            bboxes = merge_bboxes(detector_bboxes, tracker_bboxes)
+            bboxes0 = merge_bboxes(detector_bboxes, tracker_bboxes)
             
+            # cluster_bboxes, cluster_dic, cluster_num = dbscan_clustering(bboxes)
+            # print(bboxes)
+            # print(cluster_bboxes)
+            
+            # if cluster_dic:
+            #     hard_regions = [compute_union(cluster_bboxes[x], (H, W)) for x in cluster_bboxes]
+            #     hard_blocks = np.array([bbox_to_blocks(y, 128) for y in hard_regions], dtype=np.int32)
+            #     hard_bboxes = find_bbox_in_hard_region(bboxes, hard_blocks)
+            #     packed_img, packed_rect = get_merge_info(hard_blocks)
+                
             detector_tracker_end = time.time()
             detector_tracker_time = (detector_tracker_end - detector_tracker_start)*1000
             
             e2e_time = detector_tracker_time + resize_time
-            
+
             tracker_bbox_color = (255, 0, 0) if i % interval <= light_tracker_frame else (0, 255, 0)
-            img_copy = plot_bbox(img_copy, tlwh2tlbr(tracker_bboxes[..., 1:5]), color=tracker_bbox_color)
-            img_copy = plot_bbox(img_copy, tlwh2tlbr(detector_bboxes[..., 1:5]), color=(0, 0, 255))
+            img_copy = plot_bbox(img_copy, tlwh2tlbr(tracker_bboxes[..., 1:5]), color=tracker_bbox_color) if len(tracker_bboxes) != 0 else img_copy
+            img_copy = plot_bbox(img_copy, tlwh2tlbr(detector_bboxes[..., 1:5]), color=(0, 0, 255)) if len(detector_bboxes) != 0 else img_copy
 
         if cluster_dic:
             img_copy = plot_cluster(img_copy, hard_blocks)
             
         img_copy = plot_grid(img_copy, block_size=128)
         
-        cv2.imwrite(osp.join(save_path, img_filename.replace('png', 'jpg')), img_copy)
+        # cv2.imwrite(osp.join(save_path, img_filename.replace('png', 'jpg')), img_copy)
         
         e2e_time_list.append(e2e_time)
-        # np.savetxt(osp.join(save_path, img_filename.replace('jpg', 'txt')), tlwh2xywhn(bboxes, H, W), fmt='%.6f')
+        
+        bboxes_for_saving = bboxes0 if i % interval == 0 else tlwh2tlbr(bboxes0)
+        bboxes_for_saving = clip_bbox(bboxes_for_saving, H, W)
+        np.savetxt(osp.join(save_path, img_filename.replace('jpg', 'txt')), tlbr2xywhn(bboxes_for_saving, H, W), fmt='%.6f')
     print(e2e_time_list)
     print(np.array(e2e_time_list).mean())

@@ -9,13 +9,20 @@ def mkdir_if_missing(d):
         os.makedirs(d)
     return d
 
+def plot_bbox(img, bboxes, color=(0, 0, 255), thickness=2):
+    bboxes = np.asarray(bboxes, dtype=np.int32)
+    for bbox in bboxes:
+        x1, y1, x2, y2 = bbox
+        cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness)
+    return img
+
 if __name__ == '__main__':
-    img_root = '/home/wiser-renjie/remote_datasets/wildtrack/decoded_images/cam7'
+    img_root = '/home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/datasets_separated_splitted/MOT17-04-SDP/test/images'
     save_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    exp_id = 'gt_wildtrack_cam7_yolo8x_1152_1920_0.3_TOP3000'
+    exp_id = 'MOT17-04-SDP_yolov8x'
     save_path = mkdir_if_missing(osp.join(save_root, exp_id))
     
-    model = YOLO('/home/wiser-renjie/projects/yolov8/my/weights/yolov8x.pt')
+    model = YOLO('/home/wiser-renjie/projects/yolov8/my/weights/yolov8x_MOT17.pt')
     
     H = 1152
     W = 1920
@@ -43,4 +50,7 @@ if __name__ == '__main__':
             result = [cls, xcn, ycn, wn, hn, conf]
             results.append(result)
         txt_path = osp.join(save_path, img_filename.replace('jpg', 'txt').replace('png', 'txt'))
-        np.savetxt(txt_path, np.array(results), fmt='%.6f')
+        # np.savetxt(txt_path, np.array(results), fmt='%.6f')
+        
+        img = plot_bbox(img, bboxes)
+        cv2.imwrite(osp.join(save_path, img_filename.replace('png', 'jpg')), img)

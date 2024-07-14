@@ -7,26 +7,26 @@ from ultralytics import YOLO as yolo
 from utils import mkdir_if_missing, tlbr2tlwh, tlwh2xywhn, scale_bbox
 
 if __name__ == '__main__':
-    img_root = '/home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/datasets_separated_splitted/MOT17-09-SDP/test/images'
+    img_root = '/home/wiser-renjie/remote_datasets/wildtrack/decoded_images/cam7'
     result_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    exp_id = 'MOT17-09-SDP_medianflow_yolox_1152_1920_0.3_144_240_i10'
+    exp_id = 'wildtrack_cam7_medianflow_yolox_1152_1920_0.3_576_960_i10'
     result_path = mkdir_if_missing(osp.join(result_root, exp_id))
     
     interval = 10
     
-    model = yolo('/home/wiser-renjie/projects/yolov8/my/weights/yolov8x_MOT17.pt')
+    model = yolo('/home/wiser-renjie/projects/yolov8/my/weights/yolov8x.pt')
     tracker = cv2.legacy.MultiTracker_create()
     trackers = []
     
     H, W = 1152, 1920
-    Ht, Wt = 144, 240  # resolution for tracking
+    Ht, Wt = 576, 960  # resolution for tracking
     
     processing_times = []
     
     for i, filename in enumerate(sorted(os.listdir(img_root))):
         print('\n ----------------- Frame : {} ------------------- \n'.format(filename))
-        # if i <= 630:
-        #     continue
+        if i == 3000:
+            break
         img0 = cv2.imread(osp.join(img_root, filename))
         img = cv2.resize(img0, (W, H))
         img_track = cv2.resize(img0, (Wt, Ht))         # small img for tracking

@@ -4,6 +4,7 @@ import time
 import numpy as np
 import os.path as osp
 from kalman_filter import KalmanFilter
+from scipy.optimize import linear_sum_assignment
 
 class STrack(object):
     def __init__(self, tlwh):
@@ -150,6 +151,25 @@ def tlwh2xywhn(x, H, W):
         y[..., 5] = x[..., 5]
     return y
 
+def tlbr2xywhn(x, H, W):
+    y = np.empty_like(x)
+    
+    if y.size == 0:
+        return y
+    
+    if y.shape[1] == 4:  # [x1, y1, x2, y2]
+        y[..., 0] = np.clip((x[..., 0] + x[..., 2]) / 2 / W, 0, 1)
+        y[..., 1] = np.clip((x[..., 1] + x[..., 3]) / 2 / H, 0, 1)
+        y[..., 2] = np.clip((x[..., 2] - x[..., 0]) / W, 0, 1)
+        y[..., 3] = np.clip((x[..., 3] - x[..., 1]) / H, 0, 1)
+    elif y.shape[1] == 6:  # [cls, x1, y1, x2, y2, conf]
+        y[..., 0] = x[..., 0]
+        y[..., 1] = np.clip((x[..., 1] + x[..., 3]) / 2 / W, 0, 1)
+        y[..., 2] = np.clip((x[..., 2] + x[..., 4]) / 2 / H, 0, 1)
+        y[..., 3] = np.clip((x[..., 3] - x[..., 1]) / W, 0, 1)
+        y[..., 4] = np.clip((x[..., 4] - x[..., 2]) / H, 0, 1)
+        y[..., 5] = x[..., 5]
+    return y
 
 def compute_union(bboxes, img_size):      # img_size = (H, W)
     if not bboxes:
@@ -388,24 +408,25 @@ def handle_boundary_conflicts(prev_hard_bboxes, curr_hard_bboxes, dist_thresh=20
     prev_hard_bboxes = np.asarray(prev_hard_bboxes)
     curr_hard_bboxes = np.asarray(curr_hard_bboxes)
     
-    valid_bboxes = []
-
     if type in ['both', 'dist']:
         distances = compute_center_distance(prev_hard_bboxes, curr_hard_bboxes)
 
     if type in ['both', 'iou']:
         ious = np.array([[get_iou(prev_bbox, curr_bbox) for curr_bbox in curr_hard_bboxes] for prev_bbox in prev_hard_bboxes])
 
+    valid_indices = np.zeros(len(curr_hard_bboxes), dtype=bool)
+
     for i, prev_bbox in enumerate(prev_hard_bboxes):
         for j, curr_bbox in enumerate(curr_hard_bboxes):
             if type == 'dist' and distances[i, j] <= dist_thresh:
-                valid_bboxes.append(curr_bbox)
+                valid_indices[j] = True
             elif type == 'iou' and ious[i, j] >= iou_thresh:
-                valid_bboxes.append(curr_bbox)
-            elif type == 'both' and distances[i, j] <= dist_thresh and ious[i, j] >= iou_thresh:
-                valid_bboxes.append(curr_bbox)
-    
-    return np.array(valid_bboxes)
+                valid_indices[j] = True
+            elif type == 'both' and (distances[i, j] <= dist_thresh or ious[i, j] >= iou_thresh):
+                valid_indices[j] = True
+
+    valid_bboxes = curr_hard_bboxes[valid_indices]
+    return valid_bboxes
 
 def is_in_hard_block(bbox, hard_blocks):
     x1, y1, x2, y2 = bbox[1:5]
@@ -477,4 +498,84 @@ def error_handling(curr_bbox, prev_bbox, dist_thresh=20, ratio_thresh=0.2):
         return False
     return True
     
+def create_grid(img, block_size):
+    H, W = img.shape[:2]
     
+    if H % block_size != 0 or W % block_size != 0:
+        raise ValueError("Image dimensions must be divisible by block size.")
+    
+    H_G = H // block_size
+    W_G = W // block_size
+    
+    grid = np.zeros((H_G, W_G), dtype=np.int32)
+    return grid
+
+def activate_grid(bboxes, grid, block_size):
+    bboxes = np.asarray(bboxes)
+    if bboxes.size == 0:
+        return grid
+    
+    H, W = grid.shape
+
+    x1 = bboxes[:, 1]
+    y1 = bboxes[:, 2]
+    w = bboxes[:, 3]
+    h = bboxes[:, 4]
+    
+    start_row = y1 // block_size
+    end_row = (y1 + h) // block_size
+    start_col = x1 // block_size
+    end_col = (x1 + w) // block_size
+    
+    start_row = np.clip(start_row, 0, H-1).astype(int)
+    end_row = np.clip(end_row, 0, H-1).astype(int)
+    start_col = np.clip(start_col, 0, W-1).astype(int)
+    end_col = np.clip(end_col, 0, W-1).astype(int)
+
+    for i in range(len(bboxes)):
+        grid[start_row[i]:end_row[i]+1, start_col[i]:end_col[i]+1] = 1
+    
+    return grid
+
+def compute_union2(bboxes, img_size):
+    if len(bboxes) == 0:
+        return None
+    
+    bboxes = np.array(bboxes)
+    H, W = img_size
+    
+    # 初始化联合边界框的坐标
+    union_bboxes = []
+    
+    while len(bboxes) > 0:
+        # 选择第一个边界框作为基准
+        base_bbox = bboxes[0]
+        x1, y1, x2, y2 = base_bbox
+        # 移除基准边界框
+        bboxes = np.delete(bboxes, 0, axis=0)
+        
+        # 找到所有与基准边界框相交的边界框
+        inter_idx = []
+        for i, bbox in enumerate(bboxes):
+            bx1, by1, bx2, by2 = bbox
+            # 检查是否相交
+            if not (x2 < bx1 or x1 > bx2 or y2 < by1 or y1 > by2):
+                inter_idx.append(i)
+                # 扩展基准边界框
+                x1 = min(x1, bx1)
+                y1 = min(y1, by1)
+                x2 = max(x2, bx2)
+                y2 = max(y2, by2)
+        
+        # 将相交的边界框移除
+        bboxes = np.delete(bboxes, inter_idx, axis=0)
+        
+        # 裁剪联合边界框到图像大小
+        x1 = max(0, x1)
+        y1 = max(0, y1)
+        x2 = min(W, x2)
+        y2 = min(H, y2)
+        
+        union_bboxes.append([x1, y1, x2, y2])
+    
+    return union_bboxes

@@ -30,7 +30,7 @@ def create_video_from_folder(folder_path, output_file, fps):
     out.release()
 
 # Example usage:
-folder_path = "/home/wiser-renjie/projects/yolov8/my/runs/my/test_error_handling_MOT"  # Replace with the path to your folder
-output_file = "test_error_handling_MOT.mp4"
+folder_path = "/home/wiser-renjie/projects/yolov8/my/runs/my/MOT17-04-SDP_yolov8x"  # Replace with the path to your folder
+output_file = "MOT17-04-SDP_yolov8x.mp4"
 fps = 5  # Frames per second
 create_video_from_folder(folder_path, output_file, fps)
