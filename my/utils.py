@@ -4,7 +4,6 @@ import time
 import numpy as np
 import os.path as osp
 from kalman_filter import KalmanFilter
-from scipy.optimize import linear_sum_assignment
 
 class STrack(object):
     def __init__(self, tlwh):
@@ -507,7 +506,7 @@ def create_grid(img, block_size):
     H_G = H // block_size
     W_G = W // block_size
     
-    grid = np.zeros((H_G, W_G), dtype=np.int32)
+    grid = grid = torch.ones((N, 1, G[0], G[1]), device=policy_meta["inputs"].device, dtype=torch.bool)
     return grid
 
 def activate_grid(bboxes, grid, block_size):

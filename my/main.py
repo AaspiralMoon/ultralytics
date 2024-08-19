@@ -15,7 +15,8 @@ from test_merge import get_merge_info, get_merge_img
 if __name__ == '__main__':
     img_root = '/home/wiser-renjie/remote_datasets/MOT17_Det_YOLO/datasets_separated_splitted/MOT17-04-SDP/test/images'
     save_root = '/home/wiser-renjie/projects/yolov8/my/runs/my'
-    exp_id = 'MOT17-04-SDP_ours_yolox_1152_1920_0.3_576_960_i10'
+    # exp_id = 'MOT17-04-SDP_ours_yolox_1152_1920_0.3_576_960_i10'
+    exp_id = 'test'
     save_path = mkdir_if_missing(osp.join(save_root, exp_id))
     
     interval = 10
@@ -154,7 +155,8 @@ if __name__ == '__main__':
                 detector_bboxes = revert_bboxes(detector_bboxes, packed_rect)
                 detector_bboxes = clip_bbox(detector_bboxes, H, W)
                 t1 = time.time()
-                detector_bboxes = handle_boundary_conflicts(hard_bboxes, detector_bboxes, dist_thresh=50, type='dist')
+                detector_bboxes = handle_boundary_conflicts(hard_bboxes, detector_bboxes, dist_thresh=20, type='dist')
+                hard_bboxes = detector_bboxes
                 t2 = time.time()
                 print(f'Boundary time: {(t2-t1)*1000} ms')
                 detector_bboxes = tlbr2tlwh(detector_bboxes)
@@ -185,12 +187,12 @@ if __name__ == '__main__':
             
         img_copy = plot_grid(img_copy, block_size=128)
         
-        # cv2.imwrite(osp.join(save_path, img_filename.replace('png', 'jpg')), img_copy)
+        cv2.imwrite(osp.join(save_path, img_filename.replace('png', 'jpg')), img_copy)
         
         e2e_time_list.append(e2e_time)
         
         bboxes_for_saving = bboxes0 if i % interval == 0 else tlwh2tlbr(bboxes0)
         bboxes_for_saving = clip_bbox(bboxes_for_saving, H, W)
-        np.savetxt(osp.join(save_path, img_filename.replace('jpg', 'txt')), tlbr2xywhn(bboxes_for_saving, H, W), fmt='%.6f')
+        # np.savetxt(osp.join(save_path, img_filename.replace('jpg', 'txt')), tlbr2xywhn(bboxes_for_saving, H, W), fmt='%.6f')
     print(e2e_time_list)
     print(np.array(e2e_time_list).mean())
