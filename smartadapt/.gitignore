@@ -1,0 +1,6 @@
+
+/weights/
+/results/
+
+*.pt
+*.pkl
