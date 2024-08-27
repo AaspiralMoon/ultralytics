@@ -61,7 +61,7 @@ class LoadImages:  # for inference
         return self.nF  # number of files
     
     
-def extrack_embedding(img, layer_idx=6):
+def extract_embedding(img, layer_idx=18):
     model_path = '/home/wiser-renjie/projects/yolov8/smartadapt/weights/yolov8n_smartadapt.pt'
     model = YOLO(model_path)
     H, W, _ = img.shape
