@@ -22,10 +22,10 @@ if __name__ == '__main__':
     exp_id = 'MOT17-04-SDP_yolov8x'
     save_path = mkdir_if_missing(osp.join(save_root, exp_id))
     
-    model = YOLO('/home/wiser-renjie/projects/yolov8/my/weights/yolov8x_MOT17.pt')
+    model = YOLO('/home/wiser-renjie/projects/yolov8/my/weights/yolov8x.pt')
     
-    H = 1152
-    W = 1920
+    H = 1024
+    W = 2048
     
     for idx, img_filename in enumerate(sorted(os.listdir(img_root))):
         if idx == 3000:
